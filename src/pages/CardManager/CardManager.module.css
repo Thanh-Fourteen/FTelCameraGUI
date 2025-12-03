@@ -1,0 +1,131 @@
+/* src/pages/CardManager/CardManager.module.css */
+
+.container {
+  padding: 32px;
+  background-color: #f8f9fa; /* Màu nền sáng nhẹ */
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* --- Header Section --- */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e5e7eb; /* Đường kẻ mờ phân cách header và content */
+}
+
+/* Nhóm Title (เผื่อ bạn muốn thêm subtitle sau này) */
+.titleGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+/* Khu vực bên phải Header (Toggle + Avatar) */
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* --- User Avatar --- */
+.userAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #e5e7eb;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid #fff; /* Viền trắng để nổi bật trên nền xám */
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.userAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* --- Grid Section --- */
+.cameraGrid {
+  display: grid;
+  /* Responsive: Tự động chia cột, mỗi cột tối thiểu 300px */
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+/* --- TOGGLE SWITCH CSS (Kafka Control) --- */
+.kafkaControl {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: white;
+  padding: 8px 16px;
+  border-radius: 24px; /* Bo tròn mềm mại */
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.kafkaLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+/* Khung ngoài của nút gạt */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+}
+
+/* Ẩn checkbox mặc định */
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* Thanh trượt nền */
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #cbd5e1; /* Màu xám khi tắt */
+  transition: .3s;
+  border-radius: 34px;
+}
+
+/* Nút tròn bên trong */
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* Khi Active (Bật) */
+.switch input:checked + .slider {
+  background-color: #f97316; /* Màu cam đặc trưng của Kafka */
+}
+
+/* Di chuyển nút tròn khi bật */
+.switch input:checked + .slider:before {
+  transform: translateX(18px);
+}

@@ -1,0 +1,19 @@
+/* Tùy chỉnh dots của slick */
+.slick-dots li button:before {
+    font-size: 10px;
+    color: #cbd5e1; /* Màu chấm mặc định */
+    opacity: 1;
+}
+
+.slick-dots li.slick-active button:before {
+    color: #3b82f6; /* Màu chấm đang active (xanh dương) */
+}
+
+.slick-dots {
+    bottom: -30px; /* Đẩy dots xuống dưới một chút */
+}
+
+/* Fix lỗi hiển thị padding của slick track */
+.slick-list {
+    margin: 0 -10px; /* Bù lại padding đã set trong FeatureCard */
+}

@@ -1,0 +1,74 @@
+.banner {
+    /* Sử dụng gradient làm nền, bạn có thể thay bằng ảnh */
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    border-radius: 20px;
+    padding: 40px;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 20px 25px -5px rgba(59, 130, 246, 0.1), 0 8px 10px -6px rgba(59, 130, 246, 0.1);
+}
+
+/* Tạo một vài hình khối trang trí mờ ở nền (tùy chọn) */
+.banner::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 400px;
+    height: 400px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+}
+.banner::after {
+    content: '';
+    position: absolute;
+    bottom: -50%;
+    left: -10%;
+    width: 300px;
+    height: 300px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+}
+
+
+.content {
+    position: relative;
+    z-index: 1;
+    max-width: 800px;
+}
+
+.title {
+    font-size: 32px;
+    font-weight: 800;
+    margin: 0 0 16px 0;
+    line-height: 1.2;
+}
+
+.subtitle {
+    font-size: 16px;
+    opacity: 0.9;
+    margin: 0 0 24px 0;
+    line-height: 1.6;
+}
+
+.ctaButton {
+    padding: 12px 24px;
+    background-color: white;
+    color: #2563eb;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.ctaButton:hover {
+    background-color: #f8fafc;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}

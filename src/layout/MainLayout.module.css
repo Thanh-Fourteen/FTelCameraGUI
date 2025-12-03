@@ -1,0 +1,21 @@
+.layoutWrapper {
+  display: flex; /* Xếp Sidebar và Main nằm ngang */
+  width: 100vw;
+  height: 100vh; /* Chiếm toàn bộ màn hình, không scroll ở body */
+  overflow: hidden; /* Ẩn scroll của body chính */
+  background-color: #f8fafc; /* Màu nền tổng thể xám nhẹ */
+}
+
+.mainContent {
+  flex: 1; /* Chiếm toàn bộ phần còn lại bên phải */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden; /* Để scroll nằm ở con của nó */
+}
+
+.pageContainer {
+  flex: 1;
+  overflow-y: auto; /* Chỉ scroll phần nội dung này thôi */
+  padding: 0; /* Padding do từng page tự quyết định */
+}

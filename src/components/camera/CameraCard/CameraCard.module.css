@@ -1,0 +1,102 @@
+/* src/components/CameraCard.module.css */
+
+.cameraCard {
+  background: white;
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  aspect-ratio: 4/3;
+}
+
+.cameraCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.addCard {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f5f7fa;
+  border: 2px dashed #d1d5db;
+}
+
+.addIcon {
+  font-size: 48px;
+  color: #9ca3af;
+  font-weight: 300;
+}
+
+.cardImageWrapper {
+  position: relative;
+  flex: 1;
+  background: #eee;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.cameraThumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cameraPlaceholderImg {
+    /* Style cho placeholder nếu không có ảnh */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: 2rem;
+}
+
+.badgeLive {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: #ff4d4f;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cardFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px;
+}
+
+.cameraName {
+  font-weight: 600;
+  color: #333;
+}
+
+.statusIndicator {
+    /* Style chung cho icon status */
+    font-size: 14px;
+}
+
+/* Các trạng thái cụ thể */
+.online {
+  color: #52c41a;
+  font-weight: bold;
+}
+
+.offline {
+  color: #d9d9d9;
+}
+
+.maintenance {
+    color: #faad14;
+}

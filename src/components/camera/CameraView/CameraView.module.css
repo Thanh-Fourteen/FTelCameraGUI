@@ -1,0 +1,179 @@
+/* src/components/camera/CameraView/CameraView.module.css */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 24px;
+  background-color: #f3f4f6; /* Màu nền nhẹ nhàng */
+  box-sizing: border-box;
+}
+
+/* --- Header Section --- */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+/* Nút Back dạng text */
+.backBtn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  font-weight: 500;
+  color: #4b5563;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+  transition: color 0.2s;
+}
+.backBtn:hover {
+  color: #2563eb; /* Màu xanh khi hover */
+}
+
+/* Nút Config màu xanh */
+.configBtn {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.configBtn:hover {
+  background-color: #1d4ed8;
+}
+
+/* --- Video Area --- */
+.videoContainer {
+  position: relative;
+  width: 100%;
+  max-width: 1200px; /* Giới hạn chiều rộng để không bị quá to trên màn hình lớn */
+  margin: 0 auto;    /* Căn giữa */
+  aspect-ratio: 16/9; /* Tỉ lệ chuẩn video */
+  background-color: #000;
+  border-radius: 12px;
+  overflow: hidden; /* Bo tròn các góc video */
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3); /* Đổ bóng tạo chiều sâu */
+  display: flex;
+  flex-direction: column;
+}
+
+.videoScreen {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #111;
+}
+
+/* Nút Play to ở giữa màn hình */
+.bigPlayBtn {
+  width: 80px;
+  height: 80px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: transform 0.2s, background 0.2s;
+  color: white;
+  font-size: 32px;
+  border: 2px solid rgba(255,255,255,0.3);
+}
+.bigPlayBtn:hover {
+  transform: scale(1.1);
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Badge LIVE góc trái trên */
+.liveBadge {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  background-color: rgba(220, 38, 38, 0.9); /* Đỏ đậm */
+  color: white;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  z-index: 10; /* Đè lên video */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* --- Controls Bar (Thanh điều khiển bên dưới) --- */
+.controlsBar {
+  height: 56px;
+  background: rgba(0, 0, 0, 0.85); /* Nền đen mờ */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  color: #e5e7eb;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.controlGroup {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.controlIcon {
+  cursor: pointer;
+  font-size: 20px;
+  opacity: 0.8;
+  transition: opacity 0.2s, color 0.2s;
+}
+.controlIcon:hover {
+  opacity: 1;
+  color: white;
+}
+
+.loadingOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7); /* Nền đen mờ */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 50; /* Đè lên tất cả */
+  color: white;
+  gap: 15px;
+}
+
+/* Tạo vòng quay đơn giản */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top: 4px solid #3b82f6; /* Màu xanh */
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

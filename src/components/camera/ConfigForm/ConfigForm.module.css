@@ -1,0 +1,44 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 10px;
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+}
+.serviceBlock {
+    background: #f9fafb;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+.serviceTitle {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    font-weight: bold;
+    color: #374151;
+    text-transform: uppercase;
+}
+.fieldsGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* 2 cột */
+    gap: 12px;
+}
+.fieldGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b7280;
+}
+.input {
+    padding: 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 13px;
+    width: 100%;
+    box-sizing: border-box;
+}
