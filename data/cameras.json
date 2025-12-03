@@ -1,0 +1,21 @@
+{
+    "1": {
+        "camera_id": "1",
+        "rtsp_url": "rtsp://192.168.2.130:8222/live_fall1",
+        "ws_port": 9898,
+        "settings": {
+            "modules": [
+                "tracking_service",
+                "detection"
+            ],
+            "polygon": [
+                [
+                    0
+                ]
+            ],
+            "config": {}
+        },
+        "status": "stopped",
+        "output_topic": "CAMERA_1_tracking"
+    }
+}

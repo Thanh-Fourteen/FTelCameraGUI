@@ -1,0 +1,34 @@
+networks:
+  stream-kafka:
+    external: true
+    name: ftelcamera_stream-kafka
+services:
+  viewer_service:
+    container_name: viewer_service_1
+    environment:
+      ALERT: '1'
+      CONSUMER_GROUP: pythera_group_1
+      INPUT_TOPIC: CAMERA_1_tracking
+      INV_SCALE: 'false'
+      KAFKA_BOOTSTRAP: kafka:9092
+      OUTPUT_FPS: 25
+      OUTPUT_VIDEO_PATH: /data
+      PLOT: all
+      VERBOSE: 'false'
+      VERSION: 1
+      VIDEO_CODEC: mp4v
+      VIDEO_FILENAME: 1.mp4
+      VIEWER_MODE: web
+      WEBSOCKET_HOST: 0.0.0.0
+      WEBSOCKET_MAX_CLIENTS: 50
+      WEBSOCKET_PORT: '9898'
+      WEBSOCKET_QUALITY: 100
+      WEBSOCKET_QUEUE: 120
+    image: nvtien/viewer:latest
+    networks:
+    - stream-kafka
+    ports:
+    - 9898:9898
+    restart: unless-stopped
+    volumes:
+    - /home/tiennv/tiennv/FPT/thanhnn/FtelCamera/data/output:/data
