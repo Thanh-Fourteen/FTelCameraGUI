@@ -1,9 +1,9 @@
 # utils/templates.py
 
 # Cấu hình chung mặc định (Có thể override từ API Settings)
-AI_SERVER_URL = "192.168.2.130:8088"
+AI_SERVER_URL = "192.168.1.130:8088"
 KAFKA_HOST = "kafka:9092"
-SEARCH_SERVER_URL = "http://192.168.2.130:8686/v1"
+SEARCH_SERVER_URL = "http://192.168.1.130:8686/v1"
 
 def get_ai_template(cam_id, topic_in, topic_out):
     """
@@ -68,9 +68,10 @@ def get_ai_template(cam_id, topic_in, topic_out):
                 **base_ai_env,
                 "INPUT_TOPIC": topic_in,
                 "OUTPUT_TOPIC": topic_out,
-                "CONSUMER_GROUP": f"pythera_group{suffix}",
+                "CONSUMER_GROUP": f"tracking_group{suffix}",
                 "MODEL_NAME": "reid_ensemble",
                 "VERSION": 1,
+                "FRAME_RATE": 27,
                 "USE_REID": "False",
                 "THRESHOLD": 0.92,
                 "BATCH_SIZE": 4
@@ -88,8 +89,9 @@ def get_ai_template(cam_id, topic_in, topic_out):
                 **base_ai_env,
                 "INPUT_TOPIC": topic_in,
                 "OUTPUT_TOPIC": topic_out,
-                "CONSUMER_GROUP": f"pythera_group{suffix}",
+                "CONSUMER_GROUP": f"pose_group{suffix}",
                 "MODEL_NAME": "pose_ensemble",
+                "FRAME_RATE": 27,
                 "VERSION": 1,
                 "THRESHOLD": 0.2,
                 "BATCH_SIZE": 6
@@ -107,9 +109,10 @@ def get_ai_template(cam_id, topic_in, topic_out):
                 **base_ai_env,
                 "INPUT_TOPIC": topic_in,
                 "OUTPUT_TOPIC": topic_out,
-                "CONSUMER_GROUP": f"pythera_group{suffix}",
+                "CONSUMER_GROUP": f"action_group{suffix}",
                 "MODEL_NAME": "fall_ensemble",
                 "VERSION": 1,
+                "FRAME_RATE": 27,
                 "THRESHOLD": 0.25,
                 "MAX_FRAMES": 30,
                 "SLIDE_STEP": 1,
@@ -201,7 +204,7 @@ def get_ai_template(cam_id, topic_in, topic_out):
                  "KAFKA_BOOTSTRAP": KAFKA_HOST,
                  "INPUT_TOPIC": topic_in,
                  "OUTPUT_TOPIC": topic_out,
-                 "CONSUMER_GROUP": f"pythera_group{suffix}",
+                 "CONSUMER_GROUP": f"counting_group{suffix}",
                  "POLYGON_COORDS": "[]",
                  "INCLUDE_CLASSES": '["body"]',
                  "EXCLUDE_CLASSES": '[]',

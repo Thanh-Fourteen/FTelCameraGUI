@@ -10,7 +10,7 @@ DB_FILE = "data/cameras.json"
 # 🚨 CÔNG TẮC CHẾ ĐỘ DEMO (LẤP LIẾM MODE) 🚨
 # True = Chạy video có sẵn, đổi topic, không chạy AI thật
 # False = Chạy hệ thống thật (Full Docker AI)
-DEMO_MODE = True 
+DEMO_MODE = False 
 # ==========================================
 
 class CameraService:
