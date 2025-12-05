@@ -28,3 +28,4 @@ deployments/
 
 __pycache__/
 .env
+test.py
