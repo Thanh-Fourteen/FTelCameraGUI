@@ -27,3 +27,4 @@ data/
 deployments/
 
 __pycache__/
+.env
