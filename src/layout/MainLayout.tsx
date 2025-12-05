@@ -5,7 +5,7 @@ import styles from './MainLayout.module.css';
 
 export const MainLayout: React.FC = () => {
   // State quản lý trạng thái thu gọn
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   const toggleSidebar = () => {
     setIsCollapsed(!isCollapsed);

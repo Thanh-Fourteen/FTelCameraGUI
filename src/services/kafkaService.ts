@@ -1,12 +1,12 @@
+// src/services/kafkaService.ts
 import axios from "axios";
 
-// Sử dụng Proxy đã cấu hình trong vite.config.ts để tránh lỗi Mixed Content
-// Nếu port 5171 chưa có proxy, bạn cần thêm vào vite.config.ts hoặc dùng đường dẫn đầy đủ nếu đang test local HTTP
-const API_URL = 'http://192.168.2.130:5171/api'; 
+// Đảm bảo URL này khớp với cấu hình proxy (nếu dùng proxy) hoặc full URL
+// const API_URL = 'https://api.doca.love/api'; 
+const API_URL = '/api'
 
 export const kafkaService = {
     toggle: async (enable: boolean) => {
-        // Sửa typo: 'enalbe' -> 'enable'
         const response = await axios.post(`${API_URL}/system/kafka/toggle`, {
             "enable": enable 
         }, {
@@ -15,6 +15,12 @@ export const kafkaService = {
                 'accept': 'application/json',
             }
         });
+        return response.data;
+    },
+    // Thêm hàm lấy status
+    status: async () => {
+        const response = await axios.get(`${API_URL}/system/kafka/status`);
+        // Giả sử API trả về { status: "running" | "stopped", ... }
         return response.data;
     }
 }

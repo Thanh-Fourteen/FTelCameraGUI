@@ -2,7 +2,7 @@
 
 .container {
   padding: 32px;
-  background-color: #f8f9fa; /* Màu nền sáng nhẹ */
+  background-color: #f8f9fa;
   min-height: 100vh;
   box-sizing: border-box;
 }
@@ -14,10 +14,9 @@
   align-items: center;
   margin-bottom: 32px;
   padding-bottom: 20px;
-  border-bottom: 1px solid #e5e7eb; /* Đường kẻ mờ phân cách header và content */
+  border-bottom: 1px solid #e5e7eb;
 }
 
-/* Nhóm Title (เผื่อ bạn muốn thêm subtitle sau này) */
 .titleGroup {
   display: flex;
   flex-direction: column;
@@ -30,7 +29,6 @@
   margin: 0;
 }
 
-/* Khu vực bên phải Header (Toggle + Avatar) */
 .headerActions {
   display: flex;
   align-items: center;
@@ -45,7 +43,7 @@
   background-color: #e5e7eb;
   overflow: hidden;
   cursor: pointer;
-  border: 2px solid #fff; /* Viền trắng để nổi bật trên nền xám */
+  border: 2px solid #fff;
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
@@ -58,9 +56,25 @@
 /* --- Grid Section --- */
 .cameraGrid {
   display: grid;
-  /* Responsive: Tự động chia cột, mỗi cột tối thiểu 300px */
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  /* Thay vì fix cứng số cột, dùng auto-fill để tự rớt dòng khi không đủ chỗ */
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
   gap: 24px;
+  
+  /* Đảm bảo grid nằm gọn trong container */
+  width: 100%;
+}
+
+/* Responsive Breakpoints (Optional customization) */
+@media (min-width: 768px) {
+  .cameraGrid {
+    grid-template-columns: repeat(3, minmax(280px, 1fr));
+  }
+}
+
+@media (min-width: 1268px) {
+  .cameraGrid {
+    grid-template-columns: repeat(4, minmax(280px, 1fr));
+  }
 }
 
 /* --- TOGGLE SWITCH CSS (Kafka Control) --- */
@@ -70,7 +84,7 @@
   gap: 12px;
   background: white;
   padding: 8px 16px;
-  border-radius: 24px; /* Bo tròn mềm mại */
+  border-radius: 24px;
   border: 1px solid #e5e7eb;
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
@@ -128,4 +142,11 @@
 /* Di chuyển nút tròn khi bật */
 .switch input:checked + .slider:before {
   transform: translateX(18px);
+}
+
+/* --- NEW: Trạng thái Disabled (Khi đang gọi API) --- */
+.switch input:disabled + .slider {
+  opacity: 0.5; /* Làm mờ đi 50% */
+  cursor: not-allowed; /* Đổi chuột thành hình cấm */
+  background-color: #9ca3af; /* Đổi sang màu xám trung tính */
 }

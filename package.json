@@ -12,6 +12,8 @@
   "dependencies": {
     "@types/react-slick": "^0.23.13",
     "axios": "^1.13.1",
+    "http-proxy": "^1.18.1",
+    "http-proxy-middleware": "^3.0.5",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.4",

@@ -3,7 +3,8 @@ import axios from 'axios';
 import type { Camera, CreateCameraPayload, SettingsSchema } from '../types/camera';
 
 // Cấu hình Base URL (Nên đưa vào biến môi trường .env)
-const API_URL = 'http://192.168.2.130:5171/api';
+// const API_URL = 'https://api.doca.love/api';
+const API_URL = '/api'
 
 export const cameraService = {
   // Lấy danh sách camera (nếu có API get all)

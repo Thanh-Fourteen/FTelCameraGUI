@@ -36,7 +36,7 @@ export const useWebSocketFrame = ({
       const ws = new WebSocket(fixedUrl);
       ws.binaryType = 'arraybuffer';
       wsRef.current = ws;
-
+      console.log(ws)
       ws.onopen = () => {
         console.log("✅ WS Connected");
         setIsConnected(true);

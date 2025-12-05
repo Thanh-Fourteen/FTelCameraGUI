@@ -9,10 +9,10 @@ interface SidebarProps {
 }
 
 const MENU_ITEMS = [
-  { path: '/', label: 'Tổng quan', icon: '🏠' },
-  { path: '/camera', label: 'Quản lý Camera', icon: '📹' },
-  { path: '/face-register', label: 'Đăng ký khuôn mặt', icon: '👤' },
-  { path: '/image-analysis', label: 'Phân tích ảnh', icon: '🖼️' },
+  { path: '/', label: 'Overview', icon: '🏠' },
+  { path: '/camera', label: 'Camera Management', icon: '📹' },
+  { path: '/face-register', label: 'Face registration', icon: '👤' },
+  { path: '/image-analysis', label: 'Image Analysis', icon: '🖼️' },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
@@ -34,7 +34,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
       {/* Logo */}
       <div className={styles.logoContainer}>
         <div className={styles.logoIcon}>👁️</div>
-        {!isCollapsed && <span className={styles.logoText}>SmartVision</span>}
+        {!isCollapsed && <span className={styles.logoText}>Smart Camera</span>}
         <button className={styles.toggleBtn} onClick={onToggle}>
           {isCollapsed ? '›' : '‹'}
         </button>

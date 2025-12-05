@@ -29,7 +29,7 @@ export const HomePage: React.FC = () => {
       
       {/* Phần 2: Carousel các tính năng */}
       <section>
-        <h2 style={sectionTitleStyle}>Truy cập nhanh</h2>
+        <h2 style={sectionTitleStyle}>Quick Access</h2>
         <FeatureCarousel />
       </section>
       

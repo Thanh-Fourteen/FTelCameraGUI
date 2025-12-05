@@ -1,21 +1,25 @@
 .layoutWrapper {
-  display: flex; /* Xếp Sidebar và Main nằm ngang */
-  width: 100vw;
-  height: 100vh; /* Chiếm toàn bộ màn hình, không scroll ở body */
-  overflow: hidden; /* Ẩn scroll của body chính */
-  background-color: #f8fafc; /* Màu nền tổng thể xám nhẹ */
+  display: flex;
+  width: 100%; /* Dùng 100% thay vì 100vw để tránh thanh scroll ngang */
+  height: 100vh;
+  overflow: hidden; /* Ẩn scroll body */
+  background-color: #f8fafc;
 }
 
+/* Phần nội dung chính (Bên phải Sidebar) */
 .mainContent {
-  flex: 1; /* Chiếm toàn bộ phần còn lại bên phải */
+  flex: 1; /* Tự động co giãn chiếm phần còn lại */
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden; /* Để scroll nằm ở con của nó */
+  overflow: hidden; 
+  /* min-width: 0; <--- QUAN TRỌNG: Giúp flex item con (như Grid) co lại được */
+  min-width: 0; 
 }
 
 .pageContainer {
   flex: 1;
-  overflow-y: auto; /* Chỉ scroll phần nội dung này thôi */
-  padding: 0; /* Padding do từng page tự quyết định */
+  overflow-y: auto; /* Scroll nội dung dọc */
+  overflow-x: hidden; /* Ẩn scroll ngang nếu có */
+  padding: 0;
 }

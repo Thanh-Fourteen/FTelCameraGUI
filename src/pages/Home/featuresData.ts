@@ -10,18 +10,18 @@ export interface Feature {
 export const features: Feature[] = [
   {
     id: 'camera-manage',
-    title: 'Quản lý Camera',
-    description: 'Xem danh sách, thêm mới và cấu hình hệ thống camera.',
+    title: 'Camera Management',
+    description: 'View the list, add new items, and configure the camera system.',
     icon: '📹',
     link: '/camera', // Link đến trang CameraManager hiện tại
     bgColor: '#dbeafe', // Xanh dương nhạt
   },
   {
     id: 'facial-recog',
-    title: 'Nhận diện khuôn mặt',
-    description: 'Quản lý cơ sở dữ liệu khuôn mặt và xem lịch sử nhận diện.',
+    title: 'Face registration',
+    description: 'This page allows you to add faces to the system and update identification information.',
     icon: '👤',
-    link: '/face-recognition', // Route này bạn sẽ tạo sau
+    link: '/face-register', // Route này bạn sẽ tạo sau
     bgColor: '#dcfce7', // Xanh lá nhạt
   },
   // {
@@ -32,14 +32,14 @@ export const features: Feature[] = [
   //   link: '/fire-alerts',
   //   bgColor: '#fee2e2', // Đỏ nhạt
   // },
-  // {
-  //   id: 'analytics',
-  //   title: 'Thống kê & Báo cáo',
-  //   description: 'Biểu đồ phân tích lưu lượng người và các sự kiện AI.',
-  //   icon: '📊',
-  //   link: '/analytics',
-  //   bgColor: '#f3e8ff', // Tím nhạt
-  // },
+  {
+    id: 'analytics',
+    title: 'Image Analysis',
+    description: 'Upload images to detect people and recognize their identities.',
+    icon: '🖼️',
+    link: '/image-analysis',
+    bgColor: '#f3e8ff', // Tím nhạt
+  },
   //   {
   //   id: 'settings',
   //   title: 'Cài đặt hệ thống',
