@@ -13,18 +13,18 @@ const server = http.createServer((req, res) => {
 
 // Bắt sự kiện 'upgrade' để xử lý WebSocket
 server.on('upgrade', (req, socket, head) => {
-  console.log('Incoming URL:', req.url); // Log để kiểm tra
+  ('Incoming URL:', req.url); // Log để kiểm tra
 
   // --- SỬA Ở ĐÂY ---
   // Regex này có nghĩa: Tìm chữ "/camera/" sau đó lấy nhóm số (\d+) phía sau nó
   const match = req.url.match(/\/camera\/(\d+)/); 
-  console.log('Match result:', match);
+   ('Match result:', match);
 
   if (match && match[1]) {
     const targetPort = match[1]; // Lấy được số 9091
     const targetUrl = `ws://localhost:${targetPort}`;
 
-    console.log(`Connecting: ${req.url} -> ${targetUrl}`);
+     (`Connecting: ${req.url} -> ${targetUrl}`);
 
     // Forward request vào trong localhost
     // Lưu ý: ws: true để báo đây là websocket

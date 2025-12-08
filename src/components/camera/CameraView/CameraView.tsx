@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom'; // Dùng để chuyển trang khi xóa
 import { useWebSocketFrame } from '../../../hooks/useWebSocketFrame';
 import { cameraService } from '../../../services/cameraService';
 import { type Camera } from '../../../types/camera';
 import EditConfigModal from '../EditConfigModal/EditConfigModal';
 import styles from './CameraView.module.css';
+import { useNotification } from '../../../context/NotificationContext';
 
 interface CameraViewProps {
   camera: Camera;
@@ -13,13 +14,30 @@ interface CameraViewProps {
 
 const CameraView: React.FC<CameraViewProps> = ({ camera: initialCamera, onBack }) => {
   const navigate = useNavigate();
+  const { notify } = useNotification();
   const [camera, setCamera] = useState<Camera>(initialCamera);
 
+  const videoContainerRef = useRef<HTMLDivElement>(null);
   const [snapshotUrl, setSnapshotUrl] = useState<string>('');
   const [streamResolution, setStreamResolution] = useState({ width: 854, height: 480 });
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
+
+
+  useEffect(() => {
+      setCamera(initialCamera);
+      
+      // Nếu camera đang chạy mà chưa có URL -> Tự tạo URL
+      if (initialCamera.isLive && !wsUrl) {
+          const streamUrl = getStreamUrl(initialCamera);
+          setWsUrl(streamUrl);
+      }
+      // Nếu camera đã tắt -> Tắt URL
+      if (!initialCamera.isLive && wsUrl) {
+          setWsUrl(null);
+      }
+  }, [initialCamera]);
   // --- HÀM TẠO URL STREAM THÔNG MINH ---
   // Tự động xử lý Proxy (WSS) hoặc Direct (WS) dựa trên giao thức hiện tại
   const getStreamUrl = (cam: Camera) => {
@@ -27,7 +45,7 @@ const CameraView: React.FC<CameraViewProps> = ({ camera: initialCamera, onBack }
 
     // TRƯỜNG HỢP 2: Chạy HTTP thường -> Kết nối trực tiếp tới Backend
     // return `https:ws.doca.love/camera/${cam.ws_port}`;
-    return `ws://192.168.1.130:${cam.ws_port}`
+    return `ws://192.168.2.130:${cam.ws_port}`
   };
 
   // Khởi tạo URL ban đầu
@@ -44,7 +62,6 @@ const CameraView: React.FC<CameraViewProps> = ({ camera: initialCamera, onBack }
     // Kiểm tra nếu kích thước thay đổi thì mới set state (để tránh re-render vô tận)
     if (img.naturalWidth > 0 && img.naturalHeight > 0) {
       if (img.naturalWidth !== streamResolution.width || img.naturalHeight !== streamResolution.height) {
-        console.log(`🎥 Stream Dimensions Detected: ${img.naturalWidth}x${img.naturalHeight}`);
         setStreamResolution({ width: img.naturalWidth, height: img.naturalHeight });
       }
     }
@@ -82,32 +99,42 @@ const CameraView: React.FC<CameraViewProps> = ({ camera: initialCamera, onBack }
   const handlePlay = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
+    
     try {
-      console.log(`Starting camera ${camera.id}...`);
+      
+      // Gọi API Start
       await cameraService.start(camera.id);
-
-      // Update trạng thái local
+      
+      // Update trạng thái local NẾU start thành công
       const updatedCam = { ...camera, isLive: true };
       setCamera(updatedCam);
-
-      // Tạo URL và kết nối
+      
       const streamUrl = getStreamUrl(updatedCam);
       setWsUrl(streamUrl);
 
-    } catch (error) {
-      console.error("Start failed:", error);
-      alert("Không thể khởi động camera.");
+    } catch (error: any) {
+      let errorMessage = "Error Message";
+      
+      // Kiểm tra nếu có response từ backend (Axios Error)
+      if (error.response && error.response.data) {
+          // Backend trả về: { detail: "Port 3456 is already in use..." }
+          const detail = error.response.data.detail;
+          if (detail) {
+              errorMessage = `${detail}`;
+          }
+      }
+      notify(errorMessage, 'error');
     } finally {
       setIsProcessing(false);
     }
   };
 
+  
   // --- HANDLER: STOP ---
   const handleStop = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
     try {
-      console.log(`Stopping camera ${camera.id}...`);
 
       // 1. Ngắt hiển thị ngay lập tức
       setWsUrl(null);
@@ -117,13 +144,24 @@ const CameraView: React.FC<CameraViewProps> = ({ camera: initialCamera, onBack }
 
       setCamera(prev => ({ ...prev, isLive: false }));
 
-    } catch (error) {
-      console.error("Stop failed:", error);
-      alert("Lỗi khi dừng camera");
+    } catch (error: any) {
+      let errorMessage = "Error Message";
+      
+      // Kiểm tra nếu có response từ backend (Axios Error)
+      if (error.response && error.response.data) {
+          // Backend trả về: { detail: "Port 3456 is already in use..." }
+          const detail = error.response.data.detail;
+          if (detail) {
+              errorMessage = `${detail}`;
+          }
+      }
+      notify(errorMessage, 'error');
     } finally {
       setIsProcessing(false);
     }
   };
+
+  
 
   // --- HANDLER: CONFIG UPDATE ---
   const handleConfigUpdate = (updatedCamera: Camera) => {
@@ -145,7 +183,6 @@ const CameraView: React.FC<CameraViewProps> = ({ camera: initialCamera, onBack }
       setWsUrl(null);
 
       // 2. Gọi API Xóa
-      console.log(`Deleting camera ${cameraId}...`);
       await cameraService.delete(cameraId);
 
       // 3. Đóng modal & Chuyển hướng
@@ -154,11 +191,27 @@ const CameraView: React.FC<CameraViewProps> = ({ camera: initialCamera, onBack }
 
     } catch (error) {
       console.error("Delete failed:", error);
-      alert("Failed to delete camera.");
+      notify("Failed to delete camera.",'error');
       setIsProcessing(false);
     }
   };
 
+  const handleToggleFullscreen = () => {
+    if (!videoContainerRef.current) return;
+
+    if (!document.fullscreenElement) {
+      // Chưa fullscreen -> Bật lên
+      videoContainerRef.current.requestFullscreen().catch(err => {
+        console.error(`Error enabling fullscreen: ${err.message}`);
+      });
+    } else {
+      // Đang fullscreen -> Thoát ra
+      document.exitFullscreen();
+    }
+  };
+
+
+  // --- RENDER ---
   // --- RENDER ---
   return (
     <div className={styles.container}>
@@ -173,8 +226,12 @@ const CameraView: React.FC<CameraViewProps> = ({ camera: initialCamera, onBack }
         </button>
       </div>
 
-      {/* VIDEO CONTAINER */}
-      <div className={styles.videoContainer}>
+      {/* VIDEO CONTAINER (Gộp Ref vào đây) */}
+      <div 
+        className={styles.videoContainer} 
+        ref={videoContainerRef} // <--- QUAN TRỌNG: Gắn ref vào container chính này
+        style={{ backgroundColor: '#000' }} // Style nền đen khi fullscreen
+      >
         <div className={styles.videoScreen} style={{ position: 'relative', overflow: 'hidden', background: '#000' }}>
 
           {/* LOADING OVERLAY */}
@@ -192,7 +249,7 @@ const CameraView: React.FC<CameraViewProps> = ({ camera: initialCamera, onBack }
           <img
             ref={imgRef}
             alt="Main Stream"
-            onLoad={handleImageLoad} // <--- THÊM DÒNG NÀY
+            onLoad={handleImageLoad}
             style={{
               width: '100%', height: '100%', objectFit: 'contain',
               display: wsUrl ? 'block' : 'none'
@@ -206,7 +263,7 @@ const CameraView: React.FC<CameraViewProps> = ({ camera: initialCamera, onBack }
 
           {/* CONNECTING TEXT */}
           {wsUrl && !isConnected && !isProcessing && (
-            <div style={{ color: 'white', position: 'absolute' }}>Connecting...</div>
+             <div style={{ color: 'white', position: 'absolute' }}>Connecting...</div>
           )}
         </div>
 
@@ -226,8 +283,16 @@ const CameraView: React.FC<CameraViewProps> = ({ camera: initialCamera, onBack }
           </div>
 
           <div className={styles.controlGroup}>
-            <span className={styles.controlIcon}>🔊</span>
-            <span className={styles.controlIcon}>⛶</span>
+            <span className={styles.controlIcon} onClick={() => notify('Feature currently unavailable', 'info')}>🔊</span>
+            
+            {/* Nút Fullscreen */}
+            <span 
+                className={styles.controlIcon} 
+                onClick={handleToggleFullscreen}
+                title="Fullscreen"
+             >
+                ⛶
+             </span>
           </div>
         </div>
       </div>

@@ -5,6 +5,7 @@ import type { CreateCameraPayload, SettingsSchema } from '../../../types/camera'
 import ConfigForm from '../../camera/ConfigForm/ConfigForm'; // Import component mới
 import { cameraService } from '../../../services/cameraService';
 import PolygonDrawerModal from '../../common/PolygonDrawer/PolygonDrawerModal';
+import { useNotification } from '../../../context/NotificationContext';
 
 interface AddCameraModalProps {
   isOpen: boolean;
@@ -99,6 +100,7 @@ const AVAILABLE_MODULES = [
 
 const AddCameraModal: React.FC<AddCameraModalProps> = ({ isOpen, onClose, onSave }) => {
   // --- STATE ---
+  const { notify } = useNotification()
   const [cameraId, setCameraId] = useState('');
   const [rtspUrl, setRtspUrl] = useState('');
   const [wsPort, setWsPort] = useState<string>('9090');
@@ -186,7 +188,7 @@ const AddCameraModal: React.FC<AddCameraModalProps> = ({ isOpen, onClose, onSave
   const handleSave = async () => {
     // 1. Validation
     if (!cameraId || !rtspUrl || !wsPort) {
-      alert("Please fill in Camera ID, RTSP URL and Port.");
+      notify("Please fill in Camera ID, RTSP URL and Port.", "warning");
       return;
     }
 
@@ -205,7 +207,7 @@ const AddCameraModal: React.FC<AddCameraModalProps> = ({ isOpen, onClose, onSave
             throw new Error("Invalid format");
           }
         } catch (e) {
-          alert("Invalid Polygon format! Use JSON: [[x1,y1], [x2,y2]...]");
+          notify("Invalid Polygon format! Use JSON: [[x1,y1], [x2,y2]...]", 'error');
           setLoading(false);
           return;
         }
@@ -227,8 +229,18 @@ const AddCameraModal: React.FC<AddCameraModalProps> = ({ isOpen, onClose, onSave
 
       await onSave(payload);
 
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      let errorMessage = "Error Message";
+      
+      // Kiểm tra nếu có response từ backend (Axios Error)
+      if (error.response && error.response.data) {
+          // Backend trả về: { detail: "Port 3456 is already in use..." }
+          const detail = error.response.data.detail;
+          if (detail) {
+              errorMessage = `${detail}`;
+          }
+      }
+      notify(errorMessage, 'error');
     } finally {
       setLoading(false);
     }
@@ -278,10 +290,10 @@ const AddCameraModal: React.FC<AddCameraModalProps> = ({ isOpen, onClose, onSave
 
 
               <datalist id="rtsp-options">
-                <option value="rtsp://192.168.1.130:8222/live_face" />
-                <option value="rtsp://192.168.1.130:8222/live_fall" />
-                <option value="rtsp://192.168.1.130:8222/live_crowd" />
-                <option value="rtsp://192.168.1.130:8222/live_bv" />
+                <option value="rtsp://192.168.2.130:8222/live_face" />
+                <option value="rtsp://192.168.2.130:8222/live_fall" />
+                <option value="rtsp://192.168.2.130:8222/live_crowd" />
+                <option value="rtsp://192.168.2.130:8222/live_bv" />
               </datalist>
             </div>
 
@@ -338,7 +350,7 @@ const AddCameraModal: React.FC<AddCameraModalProps> = ({ isOpen, onClose, onSave
                             border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600'
                           }}
                         >
-                          ✏️ Vẽ trên màn hình
+                          ✏️ Draw on the screen
                         </button>
                       </div>
 

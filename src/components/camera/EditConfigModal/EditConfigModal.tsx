@@ -5,6 +5,7 @@ import ConfigForm from '../../camera/ConfigForm/ConfigForm';
 import { cameraService } from '../../../services/cameraService';
 import type { Camera, SettingsSchema } from '../../../types/camera';
 import PolygonDrawerModal from '../../common/PolygonDrawer/PolygonDrawerModal';
+import { useNotification } from '../../../context/NotificationContext';
 
 interface EditConfigModalProps {
     isOpen: boolean;
@@ -17,43 +18,63 @@ interface EditConfigModalProps {
 }
 
 const resolveModuleDependencies = (clickedId: string, currentSelected: string[]): string[] => {
-    // ... (Giữ nguyên logic resolveModuleDependencies của bạn)
     const isCurrentlyChecked = currentSelected.includes(clickedId);
     let newSelected = [...currentSelected];
 
+    // 1. NẾU ĐANG CHECK -> UNCHECK (Hủy chọn)
     if (isCurrentlyChecked) {
         newSelected = newSelected.filter(id => id !== clickedId);
-        if (clickedId === 'detection') newSelected = newSelected.filter(id => !['tracking_service', 'pose_detection', 'action_recognition', 'counting'].includes(id));
-        if (clickedId === 'tracking_service') newSelected = newSelected.filter(id => !['pose_detection', 'action_recognition', 'counting'].includes(id));
-        if (clickedId === 'pose_detection') newSelected = newSelected.filter(id => id !== 'action_recognition');
+
+        // Luật Hủy Ngược (Uncheck cha thì con chết theo)
+        if (clickedId === 'detection') {
+            newSelected = newSelected.filter(id => !['tracking_service', 'pose_detection', 'action_recognition', 'counting'].includes(id));
+        }
+        if (clickedId === 'tracking_service') {
+            newSelected = newSelected.filter(id => !['pose_detection', 'action_recognition', 'counting'].includes(id));
+        }
+        if (clickedId === 'pose_detection') {
+            newSelected = newSelected.filter(id => id !== 'action_recognition');
+        }
+        
         return newSelected;
     }
 
+    // 2. NẾU ĐANG UNCHECK -> CHECK (Chọn mới)
+
+    // --- CẬP NHẬT MỚI: LUẬT ĐỘC QUYỀN CHO FIRE VÀ FACE ---
     if (clickedId === 'fire') return ['fire'];
+    if (clickedId === 'face') return ['face']; // Chọn Face -> Reset hết, chỉ lấy Face
 
-    newSelected = newSelected.filter(id => id !== 'fire');
-    newSelected.push(clickedId);
+    // Nếu chọn các module khác -> Phải bỏ Fire và Face ra trước
+    newSelected = newSelected.filter(id => !['fire', 'face'].includes(id));
+    
+    newSelected.push(clickedId); // Thêm cái vừa chọn vào
 
+    // Luật Dây Chuyền (Hierarchy: Thêm cha tự thêm con)
     if (clickedId === 'action_recognition') {
         if (!newSelected.includes('pose_detection')) newSelected.push('pose_detection');
         if (!newSelected.includes('tracking_service')) newSelected.push('tracking_service');
         if (!newSelected.includes('detection')) newSelected.push('detection');
         newSelected = newSelected.filter(id => id !== 'counting');
     }
+
     if (clickedId === 'pose_detection') {
         if (!newSelected.includes('tracking_service')) newSelected.push('tracking_service');
         if (!newSelected.includes('detection')) newSelected.push('detection');
         newSelected = newSelected.filter(id => id !== 'counting');
     }
+
     if (clickedId === 'counting') {
         if (!newSelected.includes('tracking_service')) newSelected.push('tracking_service');
         if (!newSelected.includes('detection')) newSelected.push('detection');
         newSelected = newSelected.filter(id => !['action_recognition', 'pose_detection'].includes(id));
     }
+
     if (clickedId === 'tracking_service') {
         if (!newSelected.includes('detection')) newSelected.push('detection');
         newSelected = newSelected.filter(id => id !== 'counting');
     }
+
     if (clickedId === 'detection') {
         newSelected = newSelected.filter(id => id !== 'counting');
     }
@@ -74,6 +95,7 @@ const AVAILABLE_MODULES = [
 
 const EditConfigModal: React.FC<EditConfigModalProps> = ({ isOpen, onClose, camera, onUpdate, onDelete, streamResolution = { width: 1920, height: 1080 }, snapshotUrl }) => {
     // State
+    const { notify } = useNotification();
     const [rtspUrl, setRtspUrl] = useState('');
     const [wsPort, setWsPort] = useState<string>('9090');
     const [selectedModules, setSelectedModules] = useState<string[]>([]);
@@ -111,10 +133,30 @@ const EditConfigModal: React.FC<EditConfigModalProps> = ({ isOpen, onClose, came
     };
 
     const handleDeleteClick = () => {
-        const isConfirmed = window.confirm(`Are you sure you want to delete camera "${camera.name}"?\nThis action cannot be undone.`);
-        if (isConfirmed) {
-            onDelete(camera.id);
-        }
+        // THAY THẾ WINDOW.CONFIRM BẰNG CUSTOM NOTIFICATION
+        notify(
+            `Are you sure you want to delete "${camera.name}"? This cannot be undone.`,
+            "warning", // Loại cảnh báo (màu vàng)
+            "Confirm Deletion", // Tiêu đề
+            [
+                {
+                    label: "Yes, Delete",
+                    variant: "danger", 
+                    onClick: () => {
+                        // Gọi hàm xóa thật sự
+                        onDelete(camera.id);
+                    }
+                },
+                {
+                    label: "Cancel",
+                    variant: "default",
+                    onClick: () => {
+                        console.log("Deletion cancelled");
+                    }
+                }
+            ],
+            0 
+        );
     };
 
     // --- INIT DATA TỪ CAMERA HIỆN TẠI ---
@@ -190,7 +232,7 @@ const EditConfigModal: React.FC<EditConfigModalProps> = ({ isOpen, onClose, came
                 try {
                     polygonData = JSON.parse(polygonStr);
                 } catch {
-                    alert("Invalid Polygon JSON");
+                    notify("Invalid Polygon JSON", 'error');
                     setLoading(false);
                     return;
                 }
@@ -209,7 +251,6 @@ const EditConfigModal: React.FC<EditConfigModalProps> = ({ isOpen, onClose, came
                 }
             };
 
-            console.log("Updating camera:", payload);
 
             // Gọi API Update
             const updatedData = await cameraService.update(camera.id, payload);
@@ -219,9 +260,18 @@ const EditConfigModal: React.FC<EditConfigModalProps> = ({ isOpen, onClose, came
             onUpdate(newCameraObj);
             onClose();
 
-        } catch (error) {
-            console.error("Update failed", error);
-            alert("Failed to update settings");
+        } catch (error: any) {
+            let errorMessage = "Error Message";
+
+            // Kiểm tra nếu có response từ backend (Axios Error)
+            if (error.response && error.response.data) {
+                // Backend trả về: { detail: "Port 3456 is already in use..." }
+                const detail = error.response.data.detail;
+                if (detail) {
+                    errorMessage = `${detail}`;
+                }
+            }
+            notify(errorMessage, 'error');
         } finally {
             setLoading(false);
         }
@@ -248,10 +298,10 @@ const EditConfigModal: React.FC<EditConfigModalProps> = ({ isOpen, onClose, came
                                 onChange={(e) => setRtspUrl(e.target.value)}
                             />
                             <datalist id="rtsp-options">
-                                <option value="rtsp://192.168.1.130:8222/live_face" />
-                                <option value="rtsp://192.168.1.130:8222/live_fall" />
-                                <option value="rtsp://192.168.1.130:8222/live_crowd" />
-                                <option value="rtsp://192.168.1.130:8222/live_bv" />
+                                <option value="rtsp://192.168.2.130:8222/live_face" />
+                                <option value="rtsp://192.168.2.130:8222/live_fall" />
+                                <option value="rtsp://192.168.2.130:8222/live_crowd" />
+                                <option value="rtsp://192.168.2.130:8222/live_bv" />
                             </datalist>
                         </div>
 
@@ -314,7 +364,7 @@ const EditConfigModal: React.FC<EditConfigModalProps> = ({ isOpen, onClose, came
                                                         border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600'
                                                     }}
                                                 >
-                                                    ✏️ Vẽ trên màn hình
+                                                    ✏️ Draw on the screen
                                                 </button>
                                             </div>
 

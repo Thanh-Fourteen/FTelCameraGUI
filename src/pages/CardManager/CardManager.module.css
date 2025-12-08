@@ -56,15 +56,13 @@
 /* --- Grid Section --- */
 .cameraGrid {
   display: grid;
-  /* Thay vì fix cứng số cột, dùng auto-fill để tự rớt dòng khi không đủ chỗ */
+  /* Tự động chia cột thông minh */
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
   gap: 24px;
-  
-  /* Đảm bảo grid nằm gọn trong container */
   width: 100%;
 }
 
-/* Responsive Breakpoints (Optional customization) */
+/* Responsive Breakpoints */
 @media (min-width: 768px) {
   .cameraGrid {
     grid-template-columns: repeat(3, minmax(280px, 1fr));
@@ -144,9 +142,26 @@
   transform: translateX(18px);
 }
 
-/* --- NEW: Trạng thái Disabled (Khi đang gọi API) --- */
+/* Trạng thái Disabled (Khi đang gọi API) */
 .switch input:disabled + .slider {
-  opacity: 0.5; /* Làm mờ đi 50% */
-  cursor: not-allowed; /* Đổi chuột thành hình cấm */
-  background-color: #9ca3af; /* Đổi sang màu xám trung tính */
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #9ca3af;
+}
+
+/* --- SPINNER (Đã bổ sung) --- */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;      /* Viền xám nhạt */
+  border-top: 4px solid #3b82f6;  /* Viền trên màu xanh (hiệu ứng xoay) */
+  border-radius: 50%;             /* Bo tròn thành hình tròn */
+  animation: spin 1s linear infinite; /* Gọi keyframes spin */
+  margin: 0 auto;                 /* Căn giữa */
+}
+
+/* Animation xoay */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }

@@ -5,78 +5,120 @@ import { useNavigate } from 'react-router-dom';
 import CameraCard from '../../components/camera/CameraCard/CameraCard';
 import AddCameraModal from '../../components/camera/AddCameraModal/AddCameraModal';
 
-// --- SERVICES & TYPES ---
+// --- SERVICES & HOOKS ---
 import { cameraService } from '../../services/cameraService';
 import { kafkaService } from '../../services/kafkaService';
+import { useSystemStatus } from '../../hooks/useSystemStatus'; // <--- Hook Realtime
+import { useNotification } from '../../context/NotificationContext';
 import type { Camera, CreateCameraPayload } from '../../types/camera';
 
 // --- STYLES ---
 import styles from './CardManager.module.css';
 
 const CardManager: React.FC = () => {
+  const navigate = useNavigate();
+  const { notify } = useNotification();
+
+  // 1. Gọi Hook Realtime (Lắng nghe toàn bộ hệ thống)
+  const { systemStatus, cameraStatuses } = useSystemStatus();
+
   // --- STATE ---
   const [cameras, setCameras] = useState<Camera[]>([]);
-  
-  // Loading này CHỈ DÀNH RIÊNG cho danh sách Camera
   const [loadingCameras, setLoadingCameras] = useState<boolean>(true);
   
-  // State quản lý Kafka
-  const [isKafkaEnabled, setIsKafkaEnabled] = useState<boolean>(false); 
+  // State Kafka & Toggle
+  const [isKafkaEnabled, setIsKafkaEnabled] = useState<boolean>(false);
   const [isToggling, setIsToggling] = useState<boolean>(false);
 
-  // Quản lý Modal
+  // Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const navigate = useNavigate();
-
-  // --- EFFECTS ---
+  // --- INITIAL FETCH (HTTP) ---
   useEffect(() => {
-    // Gọi 2 hàm này hoàn toàn độc lập. 
-    // Hàm nào xong trước thì update UI phần đó trước.
-    fetchCameras();
-    fetchKafkaStatus();
-  }, []);
-
-  // 1. Lấy danh sách Camera (Quan trọng -> Có Loading)
-  const fetchCameras = async () => {
-    try {
-      setLoadingCameras(true); // Bắt đầu load cam
-      
-      const data = await cameraService.getAll();
-      const mappedCameras: Camera[] = data.map((cam: any) => ({
-        ...cam,
-        id: cam.camera_id,
-        name: cam.camera_id,
-        isLive: cam.status === 'running',
-        thumbnailUrl: cam.thumbnailUrl || undefined
-      }));
-      setCameras(mappedCameras);
-      
-    } catch (error) {
-      console.error("Failed to fetch cameras:", error);
-    } finally {
-      setLoadingCameras(false); // Xong cam thì tắt loading ngay, kệ Kafka
-    }
-  };
-
-  // 2. Lấy trạng thái Kafka (Phụ -> Chạy ngầm)
-  const fetchKafkaStatus = async () => {
+    const initData = async () => {
       try {
-          // Nút toggle sẽ ở trạng thái mặc định (false) cho đến khi API này trả về
-          const data = await kafkaService.status();
-          
-          // Map dữ liệu từ backend (giả sử backend trả về status hoặc is_active)
-          const isRunning = data.status === 'running' || data.is_active === true || data === true;
-          
-          setIsKafkaEnabled(isRunning);
-          // console.log("Kafka Status Loaded:", isRunning);
-      } catch (error) {
-          console.error("Failed to fetch Kafka status (User might not notice this):", error);
+        setLoadingCameras(true);
+        // Lấy danh sách camera ban đầu
+        const data = await cameraService.getAll();
+        
+        const mapped = data.map((c: any) => ({
+          ...c,
+          id: c.camera_id,
+          name: c.camera_id,
+          // Status ban đầu lấy từ DB
+          isLive: c.status === 'running' || c.status === 'starting',
+          thumbnailUrl: c.thumbnailUrl
+        }));
+        setCameras(mapped);
+
+        // Lấy trạng thái Kafka ban đầu (để nút không bị sai trước khi WS kết nối)
+        const kafkaData = await kafkaService.status();
+        const isRunning = kafkaData.status === 'running' || kafkaData.is_active === true;
+        setIsKafkaEnabled(isRunning);
+
+      } catch (e) {
+        console.error("Init data failed", e);
+        notify("Failed to load initial data", "error");
+      } finally {
+        setLoadingCameras(false);
       }
-  };
+    };
+
+    initData();
+  }, [notify]);
+
+  // --- REAL-TIME SYNC (WebSocket) ---
+  // --- REAL-TIME SYNC (WebSocket) ---
+  useEffect(() => {
+    // 1. Đồng bộ Kafka Switch (Giữ nguyên)
+    if (systemStatus?.kafka) {
+        setIsKafkaEnabled(systemStatus.kafka.status === 'running');
+    }
+
+    // 2. ĐỒNG BỘ DANH SÁCH CAMERA (LOGIC MỚI)
+    if (cameraStatuses && Array.isArray(cameraStatuses)) {
+        // Thay vì chỉ update status, ta sẽ RE-SYNC lại toàn bộ danh sách
+        // Tuy nhiên, WS thường chỉ trả về status rút gọn (id, status, rtsp), thiếu thumbnail.
+        // Nên ta phải merge khéo léo:
+        
+        setCameras(prevCameras => {
+            // Tạo Map để tra cứu nhanh camera cũ
+            const prevMap = new Map(prevCameras.map(c => [c.id, c]));
+            
+            // Tạo danh sách mới từ dữ liệu WebSocket
+            const newCameras = cameraStatuses.map(wsCam => {
+                const oldCam = prevMap.get(wsCam.camera_id);
+                
+                // Nếu camera đã tồn tại -> Giữ lại thumbnail cũ, update status mới
+                if (oldCam) {
+                    const newIsLive = wsCam.status === 'running' || wsCam.status === 'starting';
+                    // Chỉ return object mới nếu có thay đổi (để tối ưu render)
+                    if (oldCam.status !== wsCam.status || oldCam.isLive !== newIsLive) {
+                        return { ...oldCam, status: wsCam.status, isLive: newIsLive };
+                    }
+                    return oldCam;
+                }
+
+                // Nếu camera mới tinh (do người khác thêm) -> Tạo object mới
+                return {
+                    id: wsCam.camera_id,
+                    name: wsCam.camera_id, // Hoặc wsCam.name nếu backend trả về
+                    rtsp_url: wsCam.rtsp_url,
+                    ws_port: wsCam.ws_port,
+                    status: wsCam.status,
+                    isLive: wsCam.status === 'running' || wsCam.status === 'starting',
+                    thumbnailUrl: undefined, // Mới thì chưa có ảnh
+                    settings: wsCam.settings || {}
+                } as Camera;
+            });
+
+            return newCameras;
+        });
+    }
+  }, [systemStatus, cameraStatuses]);
 
   // --- HANDLERS ---
-  
+
   const handleCameraClick = (cam: Camera) => {
     navigate(`/camera/${cam.id}`);
   };
@@ -84,32 +126,38 @@ const CardManager: React.FC = () => {
   const handleSaveNewCamera = async (payload: CreateCameraPayload) => {
     try {
       const newCameraData: any = await cameraService.create(payload);
+      // Thêm camera mới vào list ngay lập tức
       const newCameraUI: Camera = {
         ...newCameraData,
         id: newCameraData.camera_id,
         name: newCameraData.camera_id,
         isLive: newCameraData.status === 'running',
       };
-      setCameras((prev) => [...prev, newCameraUI]);
+      setCameras(prev => [...prev, newCameraUI]);
+      
       setIsModalOpen(false);
-    } catch (error) {
-      console.error(error);
-      alert("Failed to create camera.");
+      notify("Camera created successfully", "success");
+    } catch (error: any) {
+      const msg = error.response?.data?.detail || "Failed to create camera.";
+      notify(msg, "error");
     }
   };
 
   const handleToggleKafka = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const newState = e.target.checked;
-    setIsToggling(true); // Disable nút trong lúc gọi API
+    setIsToggling(true);
     
     try {
-        console.log(`Switching Kafka to: ${newState}`);
+        // Gọi API Toggle
         await kafkaService.toggle(newState);
+        // UI sẽ tự cập nhật nhờ useEffect lắng nghe WebSocket ở trên
+        // Nhưng ta set tạm state để phản hồi nhanh (Optimistic UI)
         setIsKafkaEnabled(newState);
+        notify(`Kafka ${newState ? 'Enabled' : 'Disabled'}`, "success");
     } catch (error) {
-        console.error("Failed to toggle Kafka", error);
-        alert("Lỗi kết nối tới Kafka System!");
-        setIsKafkaEnabled(!newState); // Revert lại nếu lỗi
+        console.error("Toggle Kafka failed", error);
+        notify("Failed to toggle Kafka", "error");
+        setIsKafkaEnabled(!newState); // Revert nếu lỗi
     } finally {
         setIsToggling(false);
     }
@@ -119,7 +167,6 @@ const CardManager: React.FC = () => {
   return (
     <div className={styles.container}>
       
-      {/* HEADER: Luôn hiển thị ngay lập tức, không chờ loading */}
       <header className={styles.header}>
         <div className={styles.titleGroup}>
             <h1 className={styles.title}>Camera Management</h1>
@@ -127,7 +174,7 @@ const CardManager: React.FC = () => {
         </div>
         
         <div className={styles.headerActions}>
-           {/* Nút Kafka load độc lập, người dùng có thể thấy nó bật/tắt sau 1 xíu */}
+           {/* Nút Kafka */}
            <div className={styles.kafkaControl}>
               <span className={styles.kafkaLabel}>Kafka Stream</span>
               <label className={styles.switch}>
@@ -147,21 +194,14 @@ const CardManager: React.FC = () => {
         </div>
       </header>
 
-      {/* GRID CAMERA: Chỉ phụ thuộc vào loadingCameras */}
+      {/* Camera Grid */}
       {loadingCameras ? (
           <div style={{
-              textAlign: 'center', 
-              marginTop: '60px', 
-              color: '#6b7280',
+              textAlign: 'center', marginTop: '60px', color: '#6b7280',
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px'
           }}>
-              {/* Spinner đơn giản */}
-              <div style={{
-                  width: '30px', height: '30px', 
-                  border: '3px solid #e5e7eb', borderTop: '3px solid #3b82f6', 
-                  borderRadius: '50%', animation: 'spin 1s linear infinite'
-              }}></div>
-              <span>Đang tải danh sách camera...</span>
+              <div className={styles.spinner}></div>
+              <span>Loading cameras...</span>
           </div>
       ) : (
           <div className={styles.cameraGrid}>
@@ -176,17 +216,15 @@ const CardManager: React.FC = () => {
           </div>
       )}
 
-      {/* MODAL */}
+      {/* Modal */}
       <AddCameraModal 
          isOpen={isModalOpen} 
          onClose={() => setIsModalOpen(false)} 
          onSave={handleSaveNewCamera} 
       />
       
-      {/* Inject CSS animation cho spinner nếu chưa có */}
-      <style>{`
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-      `}</style>
+      {/* CSS Spinner Animation (Inline for simplicity) */}
+      <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };

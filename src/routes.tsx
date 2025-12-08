@@ -5,27 +5,16 @@ import CardManager from "./pages/CardManager/CardManager";
 import CameraViewPage from "./pages/CameraViewPage/CameraViewPage";
 import FaceRegistration from "./pages/FaceRegistration/FaceRegistration";
 import ImageAnalysisPage from "./pages/ImageAnalysis/ImageAnalysis";
+import AuthPage from "./pages/Auth/AuthPage";
 
 function NotFoundPage() {
     return <h1 style={{ padding: 20 }}>404 - Page Not Found</h1>
 }
 
-function SignIn() {
-    return <h1 style={{ padding: 20 }}>Sign In Page</h1>
-}
-
-function SignUp() {
-    return <h1 style={{ padding: 20 }}>Sign Up Page</h1>
-}
-
 export const routesConfig: RouteObject[] = [
     {
-        path: 'sign-in',
-        element: <SignIn />
-    },
-    {
-        path: 'sign-up',
-        element: <SignUp />
+        path: '/auth',
+        element: <AuthPage /> // Trang này nằm ngoài MainLayout thường là tốt nhất
     },
     {
         path: '/',

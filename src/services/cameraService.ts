@@ -13,6 +13,17 @@ export const cameraService = {
     const response = await axios.get(`${API_URL}/cameras/`);
     return response.data;
   },
+  getById: async (id: string): Promise<Camera> => {
+    // Nếu backend hỗ trợ GET /cameras/:id
+    const response = await axios.get(`${API_URL}/cameras/${id}`);
+    return response.data;
+
+    // Nếu chưa hỗ trợ, dùng getAll rồi lọc (Tạm thời)
+    // const all = await axios.get(`${API_URL}/cameras/`);
+    // const found = all.data.find((c: any) => c.camera_id === id);
+    // if (!found) throw new Error("Camera not found");
+    // return found;
+  },
 
   // Tạo camera mới
   create: async (payload: CreateCameraPayload): Promise<Camera> => {

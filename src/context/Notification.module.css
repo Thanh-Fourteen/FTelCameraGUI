@@ -1,0 +1,147 @@
+/* src/context/Notification.module.css */
+
+/* Container: Giữ nguyên vị trí */
+.notificationContainer {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+/* Thẻ Toast: Style mới (Trắng - Sạch - Hiện đại) */
+.toast {
+  pointer-events: auto;
+  min-width: 320px;
+  max-width: 450px;
+  
+  /* Nền trắng + Viền nhẹ */
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0; /* Viền xám rất nhạt */
+  border-left-width: 4px;    /* Viền trái dày để phân loại */
+  
+  /* Đổ bóng mềm mại (Soft Shadow) */
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  
+  /* Animation trượt */
+  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: all 0.2s ease;
+}
+
+/* Hover nhẹ để tạo cảm giác tương tác */
+.toast:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Màu sắc phân loại (Tươi sáng hơn) */
+.error { border-left-color: #ef4444; }   /* Đỏ tươi */
+.success { border-left-color: #22c55e; } /* Xanh lá */
+.warning { border-left-color: #f59e0b; } /* Vàng cam */
+.info { border-left-color: #3b82f6; }    /* Xanh dương */
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1; /* Để nội dung chiếm hết khoảng trống */
+}
+
+/* Tiêu đề: Màu đậm */
+.title {
+  font-weight: 700;
+  font-size: 15px;
+  color: #1e293b; /* Xám đen */
+  line-height: 1.2;
+}
+
+/* Nội dung: Màu nhạt hơn */
+.message {
+  font-size: 14px;
+  color: #64748b; /* Xám vừa */
+  line-height: 1.5;
+}
+
+/* Nút tắt (X): Màu xám nhạt */
+.closeBtn {
+  background: transparent;
+  border: none;
+  color: #94a3b8; /* Xám nhạt */
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.closeBtn:hover {
+  color: #475569; /* Đậm hơn khi hover */
+  background-color: #f1f5f9; /* Nền xám nhạt khi hover */
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* ... Các class cũ giữ nguyên ... */
+
+/* Container chứa các nút */
+.actionsRow {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* Style chung cho nút trong thông báo */
+.actionBtn {
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: background 0.2s;
+}
+
+/* Variant Default (Nút Cancel) */
+.actionBtn.default {
+  background-color: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+.actionBtn.default:hover {
+  background-color: #e2e8f0;
+}
+
+/* Variant Danger (Nút Xóa) */
+.actionBtn.danger {
+  background-color: #ef4444;
+  color: white;
+}
+.actionBtn.danger:hover {
+  background-color: #dc2626;
+}
+
+/* Variant Primary (Nút Đồng ý thường) */
+.actionBtn.primary {
+  background-color: #3b82f6;
+  color: white;
+}
+.actionBtn.primary:hover {
+  background-color: #2563eb;
+}

@@ -1,52 +1,64 @@
-import { 
-  createContext, 
-  useContext, 
-  useState, 
-} from 'react';
-import { useNavigate } from 'react-router-dom';
-import type { ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  signIn: (token: string) => void;
+  user: any | null;
+  signIn: (data: any) => Promise<void>;
+  signUp: (data: any) => Promise<void>;
   signOut: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(
-    localStorage.getItem('authToken')
-  );
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Lấy trạng thái từ localStorage để khi F5 không bị mất login
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem('IS_AUTH') === 'true';
+  });
   
-  const navigate = useNavigate();
+  const [user, setUser] = useState<any>(null);
 
-  const isAuthenticated = !!token;
+  const signIn = async (data: any) => {
+    console.log("Login with:", data);
+    // Giả lập API call
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        setIsAuthenticated(true);
+        setUser({ name: 'Admin User', role: 'Super Admin' });
+        localStorage.setItem('IS_AUTH', 'true');
+        resolve();
+      }, 500);
+    });
+  };
 
-  const signIn = (newToken: string) => {
-    localStorage.setItem('authToken', newToken);
-    setToken(newToken);
+  const signUp = async (data: any) => {
+    console.log("Register with:", data);
+    // Giả lập đăng ký xong tự login luôn
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        setIsAuthenticated(true);
+        setUser({ name: data.name, role: 'User' });
+        localStorage.setItem('IS_AUTH', 'true');
+        resolve();
+      }, 500);
+    });
   };
 
   const signOut = () => {
-    localStorage.removeItem('authToken');
-    setToken(null);
-    navigate('/');
+    setIsAuthenticated(false);
+    setUser(null);
+    localStorage.removeItem('IS_AUTH');
   };
 
-  const value = {
-    isAuthenticated,
-    signIn,
-    signOut
-  };
+  return (
+    <AuthContext.Provider value={{ isAuthenticated, user, signIn, signUp, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used in AuthProvider');
-  }
+  if (!context) throw new Error("useAuth must be used within AuthProvider");
   return context;
-}
+};

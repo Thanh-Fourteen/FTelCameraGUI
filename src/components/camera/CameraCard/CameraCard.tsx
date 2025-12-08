@@ -16,7 +16,7 @@ const CameraCard: React.FC<CameraCardProps> = ({ type = 'display', camera, onCli
   // Nếu camera có trạng thái 'running' (hoặc isLive), ta tạo URL kết nối ngay.
   const wsUrl = useMemo(() => {
     if (type === 'display' && camera?.isLive && camera?.ws_port) {
-      return `ws://192.168.1.130:${camera.ws_port}`;
+      return `ws://192.168.2.130:${camera.ws_port}`;
     }
     return null;
   }, [type, camera?.isLive, camera?.ws_port]);

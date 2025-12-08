@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { useNotification } from '../../context/NotificationContext';
 
 // --- API CONFIG ---
 // Lưu ý: Dùng đường dẫn tương đối nếu đã có Proxy, hoặc tuyệt đối nếu chưa
@@ -11,6 +12,7 @@ const API_RECOGNIZE_URL = '/det-api/recognition'
 type TaskType = 'detect' | 'recognize';
 
 const ImageAnalysisPage: React.FC = () => {
+  const {notify} = useNotification();
   const [collectionName, setCollectionName] = useState('');
   // --- STATE ---
   const [originalImage, setOriginalImage] = useState<string | null>(null);
@@ -60,7 +62,7 @@ const ImageAnalysisPage: React.FC = () => {
 
       if (task === 'recognize') {
         if (!collectionName) {
-          alert("Collection is not nullable");
+          notify("Collection can not be null", 'warning');
           return;
         }
         response = await axios.post(url, {
@@ -88,13 +90,13 @@ const ImageAnalysisPage: React.FC = () => {
 
         setProcessedImage(displayImage);
       } else {
-        setError('Dữ liệu trả về không đúng định dạng ảnh.');
+        setError('Data retrieve is not correct image type.');
       }
 
     } catch (err: any) {
       console.error("API Error:", err);
       const msg = err.response?.data?.detail || 'Lỗi xử lý. Vui lòng thử lại.';
-      setError(msg);
+      notify(msg, 'error')
     } finally {
       setIsLoading(false);
     }
@@ -114,7 +116,11 @@ const ImageAnalysisPage: React.FC = () => {
         <h2 style={{ color: '#1f2937', marginBottom: '20px' }}>AI Image Analysis</h2>
 
         {/* DISPLAY AREA */}
-        <input style={styles.input} value={collectionName} onChange={e => setCollectionName(e.target.value)} placeholder="Type..." />
+        <div style={styles.inputGroup}>
+          <label style={styles.label}>Collection</label>
+          <input style={styles.input} value={collectionName} onChange={e => setCollectionName(e.target.value)} placeholder="Type..." />
+        </div>
+
         <div style={styles.displayArea}>
           {isLoading ? (
             <div style={styles.loadingState}>
@@ -172,11 +178,11 @@ const ImageAnalysisPage: React.FC = () => {
                   {/* Nút phụ */}
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <label style={{ ...styles.uploadBtn, backgroundColor: '#6b7280', padding: '8px 16px', fontSize: '14px' }}>
-                      📸 Ảnh khác
+                      📸 Other picture
                       <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
                     </label>
                     <button onClick={handleReset} style={{ ...styles.btnReset, padding: '8px 16px', fontSize: '14px' }}>
-                      🗑️ Xóa
+                      🗑️ Delete
                     </button>
                   </div>
                 </div>
@@ -192,7 +198,27 @@ const ImageAnalysisPage: React.FC = () => {
 
 // --- STYLES ---
 const styles = {
-  input: { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', outline: 'none' },
+  inputGroup: {
+    marginBottom: '15px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px'
+  },
+
+  label: {
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#4b5563',
+    minWidth: '80px' // giúp label cố định độ rộng
+  },
+
+  input: {
+    flex: 1,                 // input chiếm phần còn lại
+    padding: '10px',
+    borderRadius: '8px',
+    border: '1px solid #d1d5db',
+    outline: 'none'
+  },
   pageContainer: { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#f3f4f6', fontFamily: 'Inter, sans-serif' },
   card: { backgroundColor: '#fff', width: '100%', maxWidth: '640px', padding: '32px', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', textAlign: 'center' as const },
   displayArea: { width: '100%', height: '400px', backgroundColor: '#f9fafb', borderRadius: '12px', border: '2px dashed #e5e7eb', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px', position: 'relative' as const },

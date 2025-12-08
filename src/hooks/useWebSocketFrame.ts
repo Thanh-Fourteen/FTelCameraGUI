@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useNotification } from '../context/NotificationContext';
 
 interface UseWebSocketFrameProps {
   url: string | null;
@@ -9,6 +10,7 @@ export const useWebSocketFrame = ({
   url,
   autoReconnect = true
 }: UseWebSocketFrameProps) => {
+  const {notify} = useNotification();
   const imgRef = useRef<HTMLImageElement>(null);
   const [status, setStatus] = useState('Sẵn sàng');
   const [isConnected, setIsConnected] = useState(false);
@@ -36,9 +38,7 @@ export const useWebSocketFrame = ({
       const ws = new WebSocket(fixedUrl);
       ws.binaryType = 'arraybuffer';
       wsRef.current = ws;
-      console.log(ws)
       ws.onopen = () => {
-        console.log("✅ WS Connected");
         setIsConnected(true);
         setStatus('Đã kết nối');
         ws.send(JSON.stringify({ cmd: "start" }));
@@ -107,9 +107,19 @@ export const useWebSocketFrame = ({
         ws.close();
       };
 
-    } catch (error) {
-      console.error(error);
-      setStatus('Lỗi URL');
+    }catch (error: any) {
+      let errorMessage = "Error Message";
+      
+      // Kiểm tra nếu có response từ backend (Axios Error)
+      if (error.response && error.response.data) {
+          // Backend trả về: { detail: "Port 3456 is already in use..." }
+          const detail = error.response.data.detail;
+          if (detail) {
+              errorMessage = `${detail}`;
+          }
+      }
+      notify(errorMessage, 'error');
+      setStatus("URL error")
     }
   }, [url, autoReconnect]);
 

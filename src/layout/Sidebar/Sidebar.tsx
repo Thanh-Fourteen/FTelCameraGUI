@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';// <-- import hook auth của bạn
+import { useAuth } from '../../context/AuthContext'; // <-- Import Hook
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
@@ -17,14 +17,19 @@ const MENU_ITEMS = [
 
 const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
   const navigate = useNavigate();
-  const { isAuthenticated, signOut } = useAuth();
+  const { isAuthenticated, signOut } = useAuth(); // Lấy state từ context
 
   const handleFooterClick = () => {
     if (isAuthenticated) {
-      signOut();                  // nếu đang login → logout
-      navigate('/sign-in');        // điều hướng đến Sign In
+      // Logic Logout
+      const confirm = window.confirm("Are you sure you want to sign out?");
+      if (confirm) {
+        signOut();
+        navigate('/auth');
+      }
     } else {
-      navigate('/sign-in');        // chưa login → sang Sign In
+      // Logic Login
+      navigate('/auth');
     }
   };
 
@@ -58,23 +63,43 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
         ))}
       </nav>
 
-      {/* Footer — xử lý click */}
-      <div className={styles.footer} onClick={handleFooterClick} style={{ cursor: 'pointer' }}>
+      {/* Footer — Authentication Logic */}
+      <div 
+        className={styles.footer} 
+        onClick={handleFooterClick} 
+        style={{ cursor: 'pointer' }}
+        title={isAuthenticated ? "Click to Logout" : "Click to Sign In"}
+      >
         <div className={styles.userProfile}>
-          <div className={styles.avatar}>A</div>
+          {/* Avatar thay đổi theo trạng thái */}
+          <div className={styles.avatar} style={{ backgroundColor: isAuthenticated ? '#3b82f6' : '#94a3b8' }}>
+            {isAuthenticated ? 'A' : '?'}
+          </div>
+
+          {/* Thông tin User hiển thị nếu chưa collapse */}
           {!isCollapsed && (
             <div className={styles.userInfo}>
-                <div className={styles.userName}>Admin</div>
-                <div className={styles.userRole}>Super Admin</div>
+              {isAuthenticated ? (
+                <>
+                  <div className={styles.userName}>Admin User</div>
+                  <div className={styles.userRole}>Super Admin</div>
+                </>
+              ) : (
+                <>
+                  <div className={styles.userName}>Guest</div>
+                  <div className={styles.userRole}>Please Sign In</div>
+                </>
+              )}
             </div>
           )}
         </div>
 
-        {!isCollapsed &&
+        {/* Nút Logout / Login */}
+        {!isCollapsed && (
           <button className={styles.logoutBtn}>
-            {isAuthenticated ? '⇥' : '→'}
+            {isAuthenticated ? '⇥' : '→'} {/* Icon khác nhau */}
           </button>
-        }
+        )}
       </div>
     </div>
   );
