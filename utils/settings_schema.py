@@ -32,7 +32,7 @@ def get_module_schema():
                     "key": "PLOT",
                     "label": "Drawing Mode",
                     "type": "select",
-                    "options": ["all", "face", "tracking", "none"],
+                    "options": ["all", "face","detection", "tracking","pose", "fire", "none"],
                     "default": "all"
                 },
                 {
@@ -51,7 +51,7 @@ def get_module_schema():
                     "key": "OUTPUT_FPS",
                     "label": "Output FPS",
                     "type": "number",
-                    "default": 25
+                    "default": 24
                 },
                 {
                     "key": "WEBSOCKET_QUALITY",
@@ -84,7 +84,7 @@ def get_module_schema():
             "label": "Tracking",
             "fields": [
                 {"key": "THRESHOLD", "label": "Tracking Threshold", "type": "number", "default": 0.92},
-                {"key": "FRAME_RATE", "label": "Frame Rate", "type": "number", "default": 27},
+                {"key": "FRAME_RATE", "label": "Frame Rate", "type": "number", "default": 30},
                 {"key": "USE_REID", "label": "Use ReID", "type": "boolean", "default": False},
                 {"key": "BATCH_SIZE", "label": "Batch Size", "type": "number", "default": 4},
                 {"key": "VERBOSE", "label": "Detailed Log", "type": "boolean", "default": True}
@@ -96,7 +96,7 @@ def get_module_schema():
             "label": "Pose Detection",
             "fields": [
                 {"key": "THRESHOLD", "label": "Pose Threshold", "type": "number", "default": 0.2},
-                {"key": "FRAME_RATE", "label": "Frame Rate", "type": "number", "default": 27},
+                {"key": "FRAME_RATE", "label": "Frame Rate", "type": "number", "default": 30},
                 {"key": "BATCH_SIZE", "label": "Batch Size", "type": "number", "default": 6},
                 {"key": "VERBOSE", "label": "Detailed Log", "type": "boolean", "default": True}
             ]
@@ -107,7 +107,7 @@ def get_module_schema():
             "label": "Action Recognition",
             "fields": [
                 {"key": "THRESHOLD", "label": "Action Threshold", "type": "number", "default": 0.25},
-                {"key": "FRAME_RATE", "label": "Frame Rate", "type": "number", "default": 27},
+                {"key": "FRAME_RATE", "label": "Frame Rate", "type": "number", "default": 30},
                 {"key": "MAX_FRAMES", "label": "Number of Frames to Analyze", "type": "number", "default": 30},
                 {"key": "CLASSES", "label": "Action List (JSON)", "type": "textarea", "default": '{"-1":"","0":"Standing","1":"Walking","2":"Sitting","3":"Lying Down","4":"Stand up","5":"Sit down","6":"Fall Down"}'},
                 {"key": "VERBOSE", "label": "Detailed Log", "type": "boolean", "default": True}
@@ -127,7 +127,7 @@ def get_module_schema():
                 {"key": "EXT_BATCH_SIZE", "label": "Batch Size (Ext)", "type": "number", "default": 8},
 
                 # Search params
-                {"key": "SEARCH_URL", "label": "Search Server URL", "type": "text", "default": "http://192.168.1.130:8686/v1"},
+                {"key": "SEARCH_URL", "label": "Search Server URL", "type": "text", "default": "http://192.168.2.130:8686/v1"},
                 {"key": "SEARCH_THRESHOLD", "label": "Search Threshold", "type": "number", "default": 0.5},
                 {"key": "COLLECTION_NAME", "label": "Collection", "type": "text", "default": "FPT"},
                 {"key": "VERBOSE", "label": "Detailed Log", "type": "boolean", "default": True}
@@ -149,7 +149,8 @@ def get_module_schema():
             "label": "Counting",
             "fields": [
                 {"key": "INCLUDE_CLASSES", "label": "Counting Object", "type": "text", "default": '["body"]'},
-                {"key": "VERBOSE", "label": "Detailed Log", "type": "boolean", "default": True}
+                {"key": "VERBOSE", "label": "Detailed Log", "type": "boolean", "default": True},
+                {"key": "FRAME_RATE", "label": "Frame Rate", "type": "number", "default": 30}
             ]
         }
     }

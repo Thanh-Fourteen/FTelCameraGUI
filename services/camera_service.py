@@ -251,7 +251,7 @@ class CameraService:
     def create_camera(self, cam: CameraCreate):
         data = self._read_db()
         if cam.camera_id in data:
-            raise Exception(f"Camera {cam.camera_id} already exists")
+            raise ValueError(f"Camera {cam.camera_id} already exists")
         
         output_topic = self._prepare_full_pipeline_config(
             cam.camera_id, cam.rtsp_url, cam.ws_port, cam.settings
@@ -265,6 +265,43 @@ class CameraService:
         self._write_db(data)
         return cam_dict
 
+    # def update_camera(self, cam_id, update: CameraUpdate):
+    #     data = self._read_db()
+    #     if cam_id not in data:
+    #         raise Exception("Camera not found")
+        
+    #     current = data[cam_id]
+        
+    #     current_settings_obj = CameraCreate(**current).settings
+    #     new_settings = update.settings if update.settings else current_settings_obj
+    #     new_rtsp = update.rtsp_url or current["rtsp_url"]
+    #     new_ws_port = update.ws_port or current["ws_port"]
+        
+    #     if update.rtsp_url: current["rtsp_url"] = update.rtsp_url
+    #     if update.ws_port: current["ws_port"] = update.ws_port
+    #     if update.settings: current["settings"] = update.settings.dict()
+
+    #     # Re-generate Config
+    #     output_topic = self._prepare_full_pipeline_config(
+    #         cam_id, new_rtsp, new_ws_port, new_settings
+    #     )
+    #     current["output_topic"] = output_topic
+        
+    #     # Auto Restart if Running
+    #     if current.get("status") == "running":
+    #         print(f"Restarting {cam_id} for new settings...")
+    #         try:
+    #             self.docker_service.stop_pipeline(cam_id)
+    #             self.docker_service.start_pipeline(cam_id)
+    #             current["status"] = "running"
+    #         except Exception as e:
+    #             print(f"Restart failed: {e}")
+    #             current["status"] = "stopped"
+    #             raise Exception(f"Updated settings but failed to restart: {e}")
+        
+    #     self._write_db(data)
+    #     return current
+    
     def update_camera(self, cam_id, update: CameraUpdate):
         data = self._read_db()
         if cam_id not in data:
@@ -272,6 +309,7 @@ class CameraService:
         
         current = data[cam_id]
         
+        # 1. Merge Settings
         current_settings_obj = CameraCreate(**current).settings
         new_settings = update.settings if update.settings else current_settings_obj
         new_rtsp = update.rtsp_url or current["rtsp_url"]
@@ -281,23 +319,24 @@ class CameraService:
         if update.ws_port: current["ws_port"] = update.ws_port
         if update.settings: current["settings"] = update.settings.dict()
 
-        # Re-generate Config
+        # 2. Re-generate Config
         output_topic = self._prepare_full_pipeline_config(
             cam_id, new_rtsp, new_ws_port, new_settings
         )
         current["output_topic"] = output_topic
         
-        # Auto Restart if Running
+        # 3. ---> SMART UPDATE (Thay cho Stop -> Start) <---
         if current.get("status") == "running":
-            print(f"Restarting {cam_id} for new settings...")
+            print(f"Applying smart update for {cam_id}...")
             try:
-                self.docker_service.stop_pipeline(cam_id)
-                self.docker_service.start_pipeline(cam_id)
+                # Gọi hàm update thông minh, không cần stop trước
+                self.docker_service.smart_update_pipeline(cam_id)
                 current["status"] = "running"
             except Exception as e:
-                print(f"Restart failed: {e}")
-                current["status"] = "stopped"
-                raise Exception(f"Updated settings but failed to restart: {e}")
+                print(f"Update failed: {e}")
+                # Nếu update lỗi nghiêm trọng (vd sai config), có thể set về stopped
+                # Nhưng thường up -d fail thì container cũ vẫn chạy, nên ta có thể giữ nguyên status
+                raise Exception(f"Failed to apply settings: {e}")
         
         self._write_db(data)
         return current
@@ -333,3 +372,38 @@ class CameraService:
     
     def get_camera(self, cam_id):
         return self._read_db().get(cam_id)
+
+    def sync_realtime_status(self):
+        """
+        1. Hỏi Docker xem ai đang chạy thật.
+        2. Cập nhật lại DB nếu trạng thái bị sai lệch.
+        3. Trả về danh sách camera chuẩn.
+        """
+        data = self._read_db()
+        
+        # Lấy danh sách ID đang chạy thật từ Docker
+        real_running_ids = self.docker_service.get_running_viewer_ids()
+        
+        has_change = False
+        
+        for cam_id, cam_info in data.items():
+            current_status = cam_info.get("status", "stopped")
+            
+            # Logic kiểm tra sự thật
+            is_really_running = cam_id in real_running_ids
+            
+            if is_really_running and current_status != "running":
+                # Docker chạy mà DB bảo tắt -> Sửa thành Running
+                cam_info["status"] = "running"
+                has_change = True
+                
+            elif not is_really_running and current_status == "running":
+                # DB bảo chạy mà Docker không thấy đâu -> Sửa thành Stopped (Fix lỗi status giả)
+                cam_info["status"] = "stopped"
+                has_change = True
+
+        # Nếu có sửa đổi gì thì lưu lại vào file json ngay
+        if has_change:
+            self._write_db(data)
+            
+        return list(data.values())

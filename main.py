@@ -1,7 +1,7 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import camera_router, setting_router, system_router
+from routers import camera_router, setting_router, system_router, ws_router
 
 app = FastAPI(title="AI Camera Orchestrator v4")
 
@@ -22,7 +22,7 @@ app.add_middleware(
 app.include_router(camera_router.router)
 app.include_router(setting_router.router)
 app.include_router(system_router.router)
-# app.include_router(viewer_router.router)
+app.include_router(ws_router.router)
 
 @app.get("/")
 def root():

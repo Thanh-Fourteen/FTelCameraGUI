@@ -1,6 +1,8 @@
 import subprocess
 import os
+import json
 
+DB_FILE = "data/cameras.json"
 class SystemService:
     def __init__(self):
         # Đường dẫn tới file docker compose của kafka
@@ -46,6 +48,23 @@ class SystemService:
         except Exception:
             return False
 
+    def _has_running_cameras(self):
+        if not os.path.exists(DB_FILE):
+            return False
+        
+        try:
+            with open(DB_FILE, 'r') as f:
+                data = json.load(f)
+                # Duyệt qua tất cả camera
+                for cam in data.values():
+                    # Nếu thấy bất kỳ ông nào đang running -> Báo động
+                    if cam.get("status") == "running":
+                        return True, cam.get("camera_id") # Trả về luôn tên cam đang chạy
+            return False, None
+        except Exception as e:
+            print(f"Error reading DB: {e}")
+            return False, None
+
     def toggle_kafka(self, turn_on: bool):
         """
         True = Bật (Clean Start: Down -v trước -> Up -d)
@@ -68,11 +87,13 @@ class SystemService:
             else:
                 raise Exception(f"Failed to start Kafka: {msg}")
         else:
+            has_running, cam_id = self._has_running_cameras()
+            if has_running:
+                # Ném lỗi ValueError để Router bắt và trả về 409
+                raise ValueError(f"Cannot stop Kafka! Camera '{cam_id}' is still running. Please stop all cameras first.")
+
             print("Stopping Kafka System...")
-            
-            # Tắt và xóa sạch volume
             success, msg = self._run_compose_cmd("down -v")
-            
             if success:
                 return "Kafka System Stopped and Cleaned"
             else:

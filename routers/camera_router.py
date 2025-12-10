@@ -10,6 +10,8 @@ def create_camera(camera: CameraCreate):
     # Chỉ tạo config, KHÔNG chạy docker
     try:
         return cam_service.create_camera(camera)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -18,14 +20,22 @@ def update_camera(cam_id: str, update: CameraUpdate):
     # Sửa setting và tạo lại config file
     try:
         return cam_service.update_camera(cam_id, update)
-    except Exception as e:
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/{cam_id}/start")
 def start_camera(cam_id: str):
     # Lúc này mới chạy Docker
     try:
         return cam_service.start_camera(cam_id)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
