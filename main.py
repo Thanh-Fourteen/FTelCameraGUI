@@ -29,4 +29,4 @@ def root():
     return {"message": "Orchestrator is running. Use /docs for API."}
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=5171, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=5173, reload=True)

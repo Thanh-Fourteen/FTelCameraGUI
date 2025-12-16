@@ -1,9 +1,9 @@
 # utils/templates.py
 
 # Cấu hình chung mặc định (Có thể override từ API Settings)
-AI_SERVER_URL = "192.168.1.130:8088"
+AI_SERVER_URL = "172.17.0.1:8088"
 KAFKA_HOST = "kafka:9092"
-SEARCH_SERVER_URL = "http://192.168.1.130:8686/v1"
+SEARCH_SERVER_URL = "http://172.17.0.1:8686/v1"
 
 def get_ai_template(cam_id, topic_in, topic_out):
     """
@@ -17,14 +17,14 @@ def get_ai_template(cam_id, topic_in, topic_out):
         "KAFKA_BOOTSTRAP": KAFKA_HOST,
         "URL": AI_SERVER_URL,
         "USE_GRPC": "True",
-        "VERBOSE": "false", # Mặc định tắt log cho nhẹ
-        "QUEUE_SIZE": "200"
+        "VERBOSE": "True",
+        "QUEUE_SIZE": "500"
     }
 
     templates = {
         # 1. RTSP READER
         "rtsp_reader": {
-            "image": "nvtien/rtspreader:latest",
+            "image": "tanmai0502/rtspreader:latest",
             "container_name": f"rtsp_reader{suffix}",
             "restart": "unless-stopped",
             "environment": {
@@ -42,7 +42,7 @@ def get_ai_template(cam_id, topic_in, topic_out):
 
         # 2. DETECTION
         "pythera_detection": {
-            "image": "nvtien/pythera_detection:latest",
+            "image": "tanmai0502/pythera-detection-compare:latest",
             "container_name": f"pythera_detection{suffix}",
             "restart": "unless-stopped",
             "environment": {
@@ -61,7 +61,7 @@ def get_ai_template(cam_id, topic_in, topic_out):
 
         # 3. TRACKING
         "tracking_service": {
-            "image": "nvtien/tracking:latest",
+            "image": "tanmai0502/tracking:latest",
             "container_name": f"tracking_service{suffix}",
             "restart": "unless-stopped",
             "environment": {
@@ -69,12 +69,27 @@ def get_ai_template(cam_id, topic_in, topic_out):
                 "INPUT_TOPIC": topic_in,
                 "OUTPUT_TOPIC": topic_out,
                 "CONSUMER_GROUP": f"tracking_group{suffix}",
-                "MODEL_NAME": "reid_ensemble",
-                "VERSION": 1,
                 "FRAME_RATE": 27,
-                "USE_REID": "False",
-                "THRESHOLD": 0.92,
-                "BATCH_SIZE": 4
+                "KALMAN": "bytetrack",
+                
+                "TRACK_THRESH":0.5,
+                "NEW_TRACK_THRESH":0.3,
+                "TRACK_BUFFER":60,
+                "MATCH_THRESH":0.8,
+                "PROXIMITY_THRESH":0.5,
+                "APPEARANCE_THRESH":0.25,
+                "FUSE_FIRST_ASSOCIATE":"False",
+                "REID_THRESH":0.8,
+
+                "MODEL_NAME":"reid_ensemble",
+                "VERSION":"1",
+                "USE_GRPC":"True",
+                "USE_REID":"False ",
+                "THRESHOLD":0.92,
+                "BATCH_SIZE":8,
+                "CLASSES_NAME":'{"head":"0","body":"1","cat":"2","dog":"3"}',
+
+                "USE_IOU_SCORE_ONLY":"False",
             },
             "networks": ["stream-kafka"],
             "depends_on": ["pythera_detection"]
@@ -82,7 +97,7 @@ def get_ai_template(cam_id, topic_in, topic_out):
 
         # 4. POSE DETECTION
         "pose_detection": {
-            "image": "nvtien/pose_detection:latest",
+            "image": "tanmai0502/pose-detection:latest",
             "container_name": f"pose_detection{suffix}",
             "restart": "unless-stopped",
             "environment": {
@@ -94,7 +109,7 @@ def get_ai_template(cam_id, topic_in, topic_out):
                 "FRAME_RATE": 27,
                 "VERSION": 1,
                 "THRESHOLD": 0.2,
-                "BATCH_SIZE": 6
+                "BATCH_SIZE": 4
             },
             "networks": ["stream-kafka"],
             "depends_on": ["tracking_service"]
@@ -102,7 +117,7 @@ def get_ai_template(cam_id, topic_in, topic_out):
 
         # 5. ACTION RECOGNITION
         "action_recognition": {
-            "image": "nvtien/action_recognition:latest",
+            "image": "tanmai0502/action-recognition:latest",
             "container_name": f"action_recognition{suffix}",
             "restart": "unless-stopped",
             "environment": {
@@ -127,7 +142,7 @@ def get_ai_template(cam_id, topic_in, topic_out):
 
         # 6. FACE SERVICE (Cập nhật chuẩn mới EXT_ và SEARCH_URL)
         "face_service": {
-            "image": "nvtien/face_service:latest",
+            "image": "tanmai0502/face-service:latest",
             "container_name": f"face_service{suffix}",
             "restart": "unless-stopped",
             "environment": {
@@ -166,7 +181,7 @@ def get_ai_template(cam_id, topic_in, topic_out):
 
         # 7. FIRE SERVICE
         "fire_service": {
-            "image": "nvtien/fire_service:latest",
+            "image": "tanmai0502/fire-service:latest",
             "container_name": f"fire_service{suffix}",
             "restart": "unless-stopped",
             "environment": {
@@ -197,7 +212,7 @@ def get_ai_template(cam_id, topic_in, topic_out):
 
         # 8. COUNTING SERVICE
         "counting_service": {
-             "image": "nvtien/counting:latest",
+             "image": "tanmai0502/counting:latest",
              "container_name": f"counting_service{suffix}",
              "restart": "unless-stopped",
              "environment": {
@@ -220,7 +235,7 @@ def get_ai_template(cam_id, topic_in, topic_out):
 def get_viewer_service_config(cam_id, port, input_topic, plot_mode="all", alert_mode="1"):
     suffix = f"_{cam_id}"
     return {
-        "image": "nvtien/viewer:latest",
+        "image": "tanmai0502/viewer-compare:latest",
         "container_name": f"viewer_service{suffix}",
         "restart": "unless-stopped",
         "environment": {
@@ -240,18 +255,19 @@ def get_viewer_service_config(cam_id, port, input_topic, plot_mode="all", alert_
             "WEBSOCKET_PORT": str(port),
             "WEBSOCKET_QUALITY": 100,
             "WEBSOCKET_MAX_CLIENTS": 50,
-            "WEBSOCKET_QUEUE": 120,
+            "WEBSOCKET_QUEUE": 300,
             
             # User Settings
             "PLOT": plot_mode,
             "ALERT": alert_mode,
             "INV_SCALE": "false",
-            "VERBOSE": "false"
+            "VERBOSE": "false",
+            "COMPARE": "false"
         },
         "ports": [f"{port}:{port}"],
         "volumes": [
             # Đường dẫn này nên để config động hoặc biến môi trường HOST_DATA_PATH
-            "/home/tiennv/tiennv/FPT/thanhnn/FtelCamera/data/output:/data"
+            "/data:/data"
         ],
         "networks": ["stream-kafka"]
     }
