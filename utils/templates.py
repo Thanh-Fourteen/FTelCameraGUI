@@ -142,8 +142,8 @@ def get_ai_template(cam_id, topic_in, topic_out):
 
         # 6. FACE SERVICE (Cập nhật chuẩn mới EXT_ và SEARCH_URL)
         "face_service": {
-            "image": "tanmai0502/face-services:latest",
-            "container_name": f"face_service{suffix}",
+            "image": "tanmai0502/face-recognition:latest",
+            "container_name": f"face_recognition{suffix}",
             "restart": "unless-stopped",
             "environment": {
                 "KAFKA_BOOTSTRAP": KAFKA_HOST,
@@ -151,7 +151,7 @@ def get_ai_template(cam_id, topic_in, topic_out):
                 "OUTPUT_TOPIC": topic_out,
                 "BATCH_SIZE": 4,
                 "QUEUE_SIZE": 200,
-                "CONSUMER_GROUP": f"face_service_group{suffix}",
+                "CONSUMER_GROUP": f"face_recognition_group{suffix}",
                 "VERBOSE": "false",
                 
                 # Detection Config
