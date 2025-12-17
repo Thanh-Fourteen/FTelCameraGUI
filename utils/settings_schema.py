@@ -32,7 +32,7 @@ def get_module_schema():
                     "key": "PLOT",
                     "label": "Drawing Mode",
                     "type": "select",
-                    "options": ["all", "detection", "face", "tracking", "none"],
+                    "options": ["all", "detection", "face", "tracking", "counting", "none"],
                     "default": "all"
                 },
                 {
