@@ -182,3 +182,40 @@
     padding: 8px;
     border-radius: 6px;
 }
+
+.settingsContainer {
+  padding: 10px;
+  /* Vách ngăn với phần menu bên trên */
+  border-top: 1px solid #e2e8f0; 
+  /* Đẩy setting xuống sát footer nếu menu ngắn */
+  margin-top: auto; 
+}
+
+.settingsBtn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #64748b;
+  transition: all 0.2s;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.settingsBtn:hover {
+  background-color: #f1f5f9;
+  color: #1e293b;
+}
+
+/* Footer cần bỏ border-top nếu muốn settings và footer dính liền một khối dưới đáy */
+/* Hoặc giữ nguyên border-top của footer để tạo 2 ngăn riêng biệt */
+.footer {
+  /* ... giữ nguyên các thuộc tính cũ ... */
+  border-top: 1px solid #e2e8f0; /* Vách ngăn giữa setting và user info */
+  padding: 16px;
+  margin-top: 0; /* Bỏ margin top cũ nếu có */
+}

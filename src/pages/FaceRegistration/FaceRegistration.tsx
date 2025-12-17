@@ -1,13 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import axios from 'axios';
 import CreateCollectionModal from '../../components/face/CollectionModal/CreateCollectionModal';
 import { useNotification } from '../../context/NotificationContext';
-
-// --- API CONFIG ---
-// const API_DB_BASE = 'https://fra.doca.love'; 
-// const API_COLLECTION_BASE = 'https://vec.doca.love/v1'; // Hoặc /det-api tùy bạn cấu hình
-const API_DB_BASE = '/fra-api'
-const API_COLLECTION_BASE = '/vec-api'
+import { faceRegistrationService } from '../../services/faceRegisterationService';
 
 // --- CẤU HÌNH 5 GÓC CHỤP ---
 const CAPTURE_STEPS = [
@@ -17,11 +11,12 @@ const CAPTURE_STEPS = [
   { id: 'up', label: 'Look Up', icon: '☝️', arrow: '↑', hint: 'Lift your chin up slightly' },
   { id: 'down', label: 'Look Down', icon: '👇', arrow: '↓', hint: 'Tilt your head down slightly' },
 ];
-// Key lưu trạng thái camera
+
 const CAM_STATE_KEY = 'FACE_REG_CAM_ACTIVE';
 
 const FaceRegistration: React.FC = () => {
   const { notify } = useNotification();
+
   // --- STATE ---
   const [collectionName, setCollectionName] = useState('');
   const [isCompleted, setIsCompleted] = useState(false);
@@ -43,18 +38,20 @@ const FaceRegistration: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // --- 1. KHỞI TẠO & CHECK TRẠNG THÁI CŨ ---
+  // --- 1. KHỞI TẠO ---
   useEffect(() => {
-    // 1.1 Load Collections
+    // 1.1 Load Collections từ Service
     const fetchCollections = async () => {
       try {
-        const res = await axios.get(`${API_COLLECTION_BASE}/collections`);
-        const data = res.data;
+        const data = await faceRegistrationService.getCollections();
+        
+        // Xử lý các định dạng trả về khác nhau của API
         if (data.data && Array.isArray(data.data)) setAvailableCollections(data.data);
         else if (Array.isArray(data)) setAvailableCollections(data);
         else if (data.collections) setAvailableCollections(data.collections);
       } catch (err) {
         console.error("Fetch collections failed", err);
+        notify("Failed to fetch collections", "error");
       }
     };
     fetchCollections();
@@ -64,7 +61,7 @@ const FaceRegistration: React.FC = () => {
     if (savedState === 'true') {
       startCamera();
     }
-  }, []);
+  }, [notify]);
 
   // --- 2. CAMERA CONTROL ---
   const startCamera = async () => {
@@ -73,10 +70,10 @@ const FaceRegistration: React.FC = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
       streamRef.current = stream;
       setIsCameraOpen(true);
-      // Lưu trạng thái ON
       localStorage.setItem(CAM_STATE_KEY, 'true');
     } catch (err) {
-      setError("Can't open camera, please check permission!");
+      setError("Can't open camera, please check permissions!");
+      notify("Can't open camera, please check permissions!", "error");
       setIsCameraOpen(false);
       localStorage.setItem(CAM_STATE_KEY, 'false');
     }
@@ -99,20 +96,17 @@ const FaceRegistration: React.FC = () => {
     else startCamera();
   };
 
-  // Cleanup khi rời trang (Chỉ tắt phần cứng, không đổi localStorage)
+  // Cleanup khi rời trang
   useEffect(() => {
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
-
-      // NẾU MUỐN TẮT LUÔN (KHÔNG TỰ BẬT LẠI KHI QUAY LẠI):
-      // Cập nhật trạng thái trong localStorage về false
       localStorage.setItem(CAM_STATE_KEY, 'false');
     };
   }, []);
 
-  // Gán stream vào video tag khi bật
+  // Gán stream vào video tag
   useEffect(() => {
     if (isCameraOpen && videoRef.current && streamRef.current) {
       videoRef.current.srcObject = streamRef.current;
@@ -156,7 +150,6 @@ const FaceRegistration: React.FC = () => {
       notify("Please enter user name!", "warning");
       return;
     }
-
     if (!userType) {
       notify("Please enter position!", "warning");
       return;
@@ -167,12 +160,11 @@ const FaceRegistration: React.FC = () => {
   };
 
   const handleDone = () => {
-    // Tắt camera
     stopCamera();
-    // Reset form (Optional, nếu muốn người dùng nhập người mới ngay)
     setUserName('');
     setCollectionName('');
     setMessage('');
+    setUserType('');
   };
 
   const handleCaptureStep = async () => {
@@ -188,34 +180,32 @@ const FaceRegistration: React.FC = () => {
       const blob = dataURLtoBlob(frame);
       formData.append('image_file', blob, `pose_${CAPTURE_STEPS[currentStep].id}.jpg`);
 
-      const response = await axios.post(`${API_DB_BASE}/register`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      // GỌI SERVICE
+      const response = await faceRegistrationService.registerFace(formData);
 
       if (response.status === 200) {
         if (currentStep < CAPTURE_STEPS.length - 1) {
           setMessage(`✅ Step ${currentStep + 1}/5 done! Continue...`);
+          // Tự động chuyển bước sau 0.5s
           setTimeout(() => { setMessage(''); setCurrentStep(prev => prev + 1); }, 500);
         } else {
           setMessage(`🎉 Register successfully!`);
-          notify("Register successfully")
+          notify("Register successfully", "success");
           setIsProcessStarted(false);
           setIsCompleted(true);
-          // Không tự tắt cam, giữ nguyên theo ý người dùng
         }
       }
     } catch (error: any) {
-      let errorMessage = "Error Message";
+      let errorMessage = "Registration failed";
       
-      // Kiểm tra nếu có response từ backend (Axios Error)
+      // Xử lý lỗi từ Backend trả về
       if (error.response && error.response.data) {
-          // Backend trả về: { detail: "Port 3456 is already in use..." }
           const detail = error.response.data.detail;
           if (detail) {
               errorMessage = `${detail}`;
           }
       }
-      setMessage(errorMessage)
+      setMessage(errorMessage);
       notify(errorMessage, 'error');
     } finally {
       setIsSubmitting(false);
@@ -229,7 +219,7 @@ const FaceRegistration: React.FC = () => {
     <div style={styles.pageContainer}>
       <div style={styles.card}>
 
-        {/* HEADER: Tiêu đề + Toggle Switch */}
+        {/* HEADER */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h2 style={{ color: '#1f2937', margin: 0 }}>Face Registration</h2>
 
@@ -262,7 +252,6 @@ const FaceRegistration: React.FC = () => {
               <datalist id="collection-options">
                 {availableCollections.map((col, idx) => <option key={idx} value={col} />)}
               </datalist>
-              {/* <button style={styles.btnSmall} onClick={() => setIsCollectionModalOpen(true)}>+</button> */}
             </div>
           </div>
           <div style={styles.row}>
@@ -322,7 +311,7 @@ const FaceRegistration: React.FC = () => {
           {/* TRƯỜNG HỢP 1: BẮT ĐẦU */}
           {isCameraOpen && !isProcessStarted && !isCompleted && (
             <button onClick={handleStartProcess} style={styles.btnRegister}>
-              🚀 Start Scan (5steps)
+              🚀 Start Scan (5 steps)
             </button>
           )}
 
@@ -337,7 +326,7 @@ const FaceRegistration: React.FC = () => {
           {isCompleted && (
             <button
               onClick={handleDone}
-              style={{ ...styles.btnRegister, backgroundColor: '#10b981' }} // Màu xanh lá
+              style={{ ...styles.btnRegister, backgroundColor: '#10b981' }}
             >
               ✅ Done
             </button>

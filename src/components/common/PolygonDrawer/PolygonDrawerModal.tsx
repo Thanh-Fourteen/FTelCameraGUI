@@ -129,15 +129,15 @@ const PolygonDrawerModal: React.FC<PolygonDrawerModalProps> = ({
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
-          <h3>Vẽ vùng đếm người (Counting Zone)</h3>
+          <h3>Draw Counting Zone</h3>
           <button className={styles.closeBtn} onClick={onClose}>×</button>
         </div>
 
         <div className={styles.body}>
-          <div style={{ fontSize: '12px', color: '#666', marginBottom: '5px' }}>
+          {/* <div style={{ fontSize: '12px', color: '#666', marginBottom: '5px' }}>
             Resolution Base: {videoWidth} x {videoHeight}
-          </div>
-          <p className={styles.instruction}>Click chuột vào khung hình để tạo các điểm. Máy tính sẽ tự nối chúng lại.</p>
+          </div> */}
+          <p className={styles.instruction}>Click mouse on the screen to create points. The system will connect them automatically.</p>
 
           {/* KHUNG VẼ */}
           <div
@@ -150,13 +150,13 @@ const PolygonDrawerModal: React.FC<PolygonDrawerModalProps> = ({
             }}
           >
             {/* Nếu không có ảnh nền thì hiện text placeholder */}
-            {!backgroundImage && <div className={styles.placeholderText}>Khung hình Camera (16:9)</div>}
+            {!backgroundImage && <div className={styles.placeholderText}>Aspect ratio (16:9)</div>}
 
             <canvas ref={canvasRef} className={styles.canvas} />
           </div>
 
           <div className={styles.coordPreview}>
-            Điểm đã chọn: {points.length}
+            Points selected: {points.length}
             {points.length > 0 && <span style={{ fontSize: '11px', color: '#666' }}> (Last: {points[points.length - 1].x}, {points[points.length - 1].y})</span>}
           </div>
         </div>
@@ -167,8 +167,8 @@ const PolygonDrawerModal: React.FC<PolygonDrawerModalProps> = ({
             <button className={styles.btnSecondary} onClick={handleClear} disabled={points.length === 0}>🗑 Clear</button>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button className={styles.btnSecondary} onClick={onClose}>Hủy</button>
-            <button className={styles.btnPrimary} onClick={handleConfirm}>✅ Lưu Vùng</button>
+            <button className={styles.btnSecondary} onClick={onClose}>Cancel</button>
+            <button className={styles.btnPrimary} onClick={handleConfirm}>Save</button>
           </div>
         </div>
       </div>

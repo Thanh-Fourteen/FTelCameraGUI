@@ -10,21 +10,28 @@ export const useWebSocketFrame = ({
   url,
   autoReconnect = true
 }: UseWebSocketFrameProps) => {
-  const {notify} = useNotification();
+  const { notify } = useNotification();
+  
+  // Ref cho thẻ img
   const imgRef = useRef<HTMLImageElement>(null);
+  
+  // State quản lý
   const [status, setStatus] = useState('Sẵn sàng');
   const [isConnected, setIsConnected] = useState(false);
   
+  // State chứa dữ liệu JSON mới nhất (FPS, Stats...)
+  const [lastJsonMessage, setLastJsonMessage] = useState<any>(null);
+
+  // Refs nội bộ
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevUrlRef = useRef<string | null>(null);
-  
-  // Cờ đánh dấu: "Tôi đang bận vẽ, đừng làm phiền"
   const isRenderingRef = useRef<boolean>(false);
 
   const connect = useCallback(() => {
     if (!url) return;
 
+    // Cleanup kết nối cũ
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
@@ -34,10 +41,11 @@ export const useWebSocketFrame = ({
     setStatus('Đang kết nối...');
 
     try {
-      const fixedUrl = url.replace('localhost', '127.0.0.1');
-      const ws = new WebSocket(fixedUrl);
-      ws.binaryType = 'arraybuffer';
+      const ws = new WebSocket(url);
+      // Dù backend gửi JSON (string), ta cứ để arraybuffer để support cả case binary cũ nếu config đổi lại
+      ws.binaryType = 'arraybuffer'; 
       wsRef.current = ws;
+
       ws.onopen = () => {
         setIsConnected(true);
         setStatus('Đã kết nối');
@@ -45,22 +53,50 @@ export const useWebSocketFrame = ({
       };
 
       ws.onmessage = (event) => {
-        if (!imgRef.current) return;
+        // --- TRƯỜNG HỢP 1: Backend gửi JSON (ViewerConfig.COMPARE = True) ---
+        // Payload: { "fps": 30, "image": "base64_string..." }
+        if (typeof event.data === 'string') {
+            try {
+                const data = JSON.parse(event.data);
+                
+                // 1. Cập nhật Stats (FPS)
+                setLastJsonMessage(data);
 
-        // CHIẾN THUẬT MỚI: DROP FRAME
-        // Nếu trình duyệt chưa vẽ xong frame trước, ta vứt luôn frame mới này đi
-        // để tránh làm nghẽn hàng đợi render.
-        if (isRenderingRef.current) {
-            return; 
+                // 2. Xử lý ảnh Base64 (nếu có key "image")
+                if (data.image && imgRef.current) {
+                    // Cơ chế Drop Frame đơn giản để tránh UI bị lag
+                    if (isRenderingRef.current) return;
+                    isRenderingRef.current = true;
+
+                    requestAnimationFrame(() => {
+                        if (imgRef.current) {
+                            // Format: data:image/jpeg;base64,<base64_string>
+                            // Lưu ý: Nếu backend gửi png thì đổi jpeg thành png, nhưng thường stream là jpeg
+                            imgRef.current.src = `data:image/jpeg;base64,${data.image}`;
+                            
+                            // Nếu trước đó đang dùng Blob URL (binary), cần revoke để giải phóng bộ nhớ
+                            if (prevUrlRef.current) {
+                                URL.revokeObjectURL(prevUrlRef.current);
+                                prevUrlRef.current = null;
+                            }
+                        }
+                        isRenderingRef.current = false;
+                    });
+                }
+            } catch (e) {
+                // console.warn("JSON Parse Error ignore:", e);
+            }
+            return;
         }
 
-        if (event.data instanceof ArrayBuffer) {
-            // Đánh dấu là đang bận
+        // --- TRƯỜNG HỢP 2: Backend gửi Binary (ViewerConfig.COMPARE = False) ---
+        if (!imgRef.current) return;
+        if (isRenderingRef.current) return;
+
+        if (event.data instanceof ArrayBuffer || event.data instanceof Blob) {
             isRenderingRef.current = true;
-            
             const buffer = event.data;
 
-            // Dùng requestAnimationFrame để vẽ đồng bộ với tần số quét màn hình
             requestAnimationFrame(() => {
                 if (!imgRef.current) {
                     isRenderingRef.current = false;
@@ -71,61 +107,52 @@ export const useWebSocketFrame = ({
                     const blob = new Blob([buffer], { type: 'image/jpeg' });
                     const newUrl = URL.createObjectURL(blob);
 
-                    // Xóa URL cũ để giải phóng RAM
                     if (prevUrlRef.current) {
                         URL.revokeObjectURL(prevUrlRef.current);
                     }
 
-                    // Gán hình mới
                     imgRef.current.src = newUrl;
                     prevUrlRef.current = newUrl;
-
-                    // Update status (Debounce nhẹ)
-                    setStatus((prev) => prev !== 'Streaming' ? 'Streaming' : prev);
                 } catch (e) {
-                    console.error(e);
+                    console.error("Render error", e);
                 } finally {
-                    // Vẽ xong rồi, mở cờ để nhận frame tiếp theo
                     isRenderingRef.current = false;
                 }
             });
         }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (e) => {
         if (ws !== wsRef.current) return;
         setIsConnected(false);
         setStatus('Mất kết nối');
+
         if (autoReconnect && url) {
-          reconnectTimeoutRef.current = setTimeout(connect, 2000);
+          reconnectTimeoutRef.current = setTimeout(() => {
+             connect();
+          }, 2000);
         }
       };
 
       ws.onerror = (err) => {
         if (ws !== wsRef.current) return;
         console.error("⚠️ WS Error:", err);
-        ws.close();
+        ws.close(); 
       };
 
-    }catch (error: any) {
-      let errorMessage = "Error Message";
-      
-      // Kiểm tra nếu có response từ backend (Axios Error)
-      if (error.response && error.response.data) {
-          // Backend trả về: { detail: "Port 3456 is already in use..." }
-          const detail = error.response.data.detail;
-          if (detail) {
-              errorMessage = `${detail}`;
-          }
-      }
-      notify(errorMessage, 'error');
-      setStatus("URL error")
+    } catch (error: any) {
+      console.error("WS Connection Setup Error:", error);
+      setStatus("Lỗi URL");
+      notify(`Invalid WebSocket URL: ${url}`, 'error');
     }
-  }, [url, autoReconnect]);
+  }, [url, autoReconnect, notify]);
 
   useEffect(() => {
     if (!url) {
-        if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
+        if (wsRef.current) {
+             wsRef.current.close(); 
+             wsRef.current = null;
+        }
         setIsConnected(false);
         setStatus('Sẵn sàng');
         return;
@@ -144,5 +171,5 @@ export const useWebSocketFrame = ({
     };
   }, [connect, url]);
 
-  return { imgRef, status, isConnected };
+  return { imgRef, status, isConnected, lastJsonMessage };
 };

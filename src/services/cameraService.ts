@@ -1,66 +1,101 @@
-// src/services/cameraService.ts
 import axios from 'axios';
+import { getAppConfig } from './config';
 import type { Camera, CreateCameraPayload, SettingsSchema } from '../types/camera';
 
-// Cấu hình Base URL (Nên đưa vào biến môi trường .env)
-// const API_URL = 'https://api.doca.love/api';
-const API_URL = '/api'
+const getConfig = () => getAppConfig();
 
 export const cameraService = {
-  // Lấy danh sách camera (nếu có API get all)
-  getAll: async (): Promise<Camera[]> => {
-    // Giả sử API trả về list
-    const response = await axios.get(`${API_URL}/cameras/`);
-    return response.data;
-  },
-  getById: async (id: string): Promise<Camera> => {
-    // Nếu backend hỗ trợ GET /cameras/:id
-    const response = await axios.get(`${API_URL}/cameras/${id}`);
-    return response.data;
-
-    // Nếu chưa hỗ trợ, dùng getAll rồi lọc (Tạm thời)
-    // const all = await axios.get(`${API_URL}/cameras/`);
-    // const found = all.data.find((c: any) => c.camera_id === id);
-    // if (!found) throw new Error("Camera not found");
-    // return found;
-  },
-
-  // Tạo camera mới
-  create: async (payload: CreateCameraPayload): Promise<Camera> => {
-    const response = await axios.post(`${API_URL}/cameras/`, payload, {
-      headers: {
-        'Content-Type': 'application/json',
-        'accept': 'application/json'
-      }
-    });
-    return response.data;
-  },
-  delete: async (cameraId: string) => {
-    // Gọi DELETE /api/cameras/:id
-    const response = await axios.delete(`${API_URL}/cameras/${cameraId}`);
-    return response.data;
+  // 1. GET ALL (Aggregated)
+  // API Docs: GET /nodes/all-cameras
+  getAllAggregated: async (): Promise<Camera[]> => {
+    const { apiBaseUrl } = getConfig();
+    try {
+      // SỬA: Đưa /nodes/ ra sau apiBaseUrl
+      const response = await axios.get(`${apiBaseUrl}/nodes/all-cameras`);
+      
+      // FIX LỖI "cameras.map is not a function": Kiểm tra kỹ data trả về
+      const data = response.data;
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.data)) return data.data;
+      if (data && Array.isArray(data.cameras)) return data.cameras;
+      return []; 
+    } catch (e) {
+      console.error("Error fetching aggregated cameras:", e);
+      return [];
+    }
   },
 
-  // Hàm kích hoạt AI Camera
-  start: async (cameraId: string) => {
-    // Gọi POST /api/cameras/{cam_id}/start
-    const response = await axios.post(`${API_URL}/cameras/${cameraId}/start`);
+  // 2. GET BY INSTANCE
+  // API Docs: GET /nodes/{instance_id}/cameras
+  getByInstance: async (instanceId: string): Promise<Camera[]> => {
+    const { apiBaseUrl } = getConfig();
+    try {
+      const response = await axios.get(`${apiBaseUrl}/nodes/${instanceId}/cameras`);
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (e) {
+      console.error(`Error fetching cameras for ${instanceId}:`, e);
+      return [];
+    }
+  },
+
+  // 3. GET DETAIL (Tự tìm Node ID nếu không biết)
+  getById: async (cameraId: string, instanceId: string): Promise<Camera | null> => {
+    try {
+      const { apiBaseUrl } = getConfig();
+      const response = await axios.get(`${apiBaseUrl}/nodes/${instanceId}/cameras/${cameraId}`);
+      return response.data;
+    } catch (e) {
+      console.error("Error finding camera:", e);
+      return null;
+    }
+  },
+
+  // 4. CREATE
+  // API Docs: POST /nodes/{instance_id}/cameras
+  create: async (instanceId: string, payload: CreateCameraPayload): Promise<Camera> => {
+    const { apiBaseUrl } = getConfig();
+    const response = await axios.post(`${apiBaseUrl}/nodes/${instanceId}/cameras`, payload);
     return response.data;
   },
 
-  stop: async (cameraId: string) => {
-    const response = await axios.post(`${API_URL}/cameras/${cameraId}/stop`);
+  // 5. DELETE
+  // API Docs: DELETE /nodes/{instance_id}/cameras/{cam_id}
+  delete: async (instanceId: string, cameraId: string) => {
+    const { apiBaseUrl } = getConfig();
+    const response = await axios.delete(`${apiBaseUrl}/nodes/${instanceId}/cameras/${cameraId}`);
     return response.data;
   },
 
-  getSettingsSchema: async (): Promise<SettingsSchema> => {
-    const response = await axios.get(`${API_URL}/settings/schema`);
+  // 6. START
+  // API Docs: POST /nodes/{instance_id}/cameras/{cam_id}/start
+  start: async (instanceId: string, cameraId: string) => {
+    const { apiBaseUrl } = getConfig();
+    const response = await axios.post(`${apiBaseUrl}/nodes/${instanceId}/cameras/${cameraId}/start`);
     return response.data;
   },
 
-  update: async (cameraId: string, payload: any) => {
-    // API PUT thường dùng để update
-    const response = await axios.put(`${API_URL}/cameras/${cameraId}`, payload);
+  // 7. STOP
+  // API Docs: POST /nodes/{instance_id}/cameras/{cam_id}/stop
+  stop: async (instanceId: string, cameraId: string) => {
+    const { apiBaseUrl } = getConfig();
+    const response = await axios.post(`${apiBaseUrl}/nodes/${instanceId}/cameras/${cameraId}/stop`);
+    return response.data;
+  },
+
+  // 8. SCHEMA
+  // API Docs: GET /nodes/{instance_id}/settings/schema
+  getSettingsSchema: async (instanceId: string): Promise<SettingsSchema> => {
+    const { apiBaseUrl } = getConfig();
+    const response = await axios.get(`${apiBaseUrl}/nodes/${instanceId}/settings/schema`);
+    console.log("Settings Schema:", response.data);
+    return response.data;
+  },
+
+  // 9. UPDATE
+  // API Docs: PUT /nodes/{instance_id}/cameras/{cam_id}
+  update: async (instanceId: string, cameraId: string, payload: any) => {
+    const { apiBaseUrl } = getConfig();
+    const response = await axios.put(`${apiBaseUrl}/nodes/${instanceId}/cameras/${cameraId}`, payload);
     return response.data;
   }
 };

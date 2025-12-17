@@ -1,26 +1,24 @@
-// src/services/kafkaService.ts
 import axios from "axios";
+import { getAppConfig } from './config';
 
-// Đảm bảo URL này khớp với cấu hình proxy (nếu dùng proxy) hoặc full URL
-// const API_URL = 'https://api.doca.love/api'; 
-const API_URL = '/api'
+const getConfig = () => getAppConfig();
 
 export const kafkaService = {
-    toggle: async (enable: boolean) => {
-        const response = await axios.post(`${API_URL}/system/kafka/toggle`, {
+    // API Docs: POST /nodes/{instance_id}/system/kafka/toggle
+    toggle: async (instanceId: string, enable: boolean) => {
+        const { apiBaseUrl } = getConfig();
+        const response = await axios.post(`${apiBaseUrl}/nodes/${instanceId}/system/kafka/toggle`, {
             "enable": enable 
-        }, {
-            headers: {
-                'Content-Type': 'application/json',
-                'accept': 'application/json',
-            }
         });
         return response.data;
     },
-    // Thêm hàm lấy status
-    status: async () => {
-        const response = await axios.get(`${API_URL}/system/kafka/status`);
-        // Giả sử API trả về { status: "running" | "stopped", ... }
+
+    // Hàm status: API docs chưa thấy route status riêng cho kafka.
+    // Tạm thời gọi API lấy thông tin node hoặc giả định
+    status: async (instanceId: string) => {
+        const { apiBaseUrl } = getConfig();
+        const response = await axios.get(`${apiBaseUrl}/nodes/${instanceId}/system/kafka/status`);
         return response.data;
-    }
+    },
+
 }

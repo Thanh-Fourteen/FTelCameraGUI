@@ -6,6 +6,7 @@ import CameraViewPage from "./pages/CameraViewPage/CameraViewPage";
 import FaceRegistration from "./pages/FaceRegistration/FaceRegistration";
 import ImageAnalysisPage from "./pages/ImageAnalysis/ImageAnalysis";
 import AuthPage from "./pages/Auth/AuthPage";
+import ModelComparisonPage from "./pages/ModelComparison/ModelComparisonPage";
 
 function NotFoundPage() {
     return <h1 style={{ padding: 20 }}>404 - Page Not Found</h1>
@@ -34,7 +35,7 @@ export const routesConfig: RouteObject[] = [
 
             // 3. CHI TIẾT CAMERA (path: /camera/cam_01)
             {
-                path: 'camera/:id',
+                path: 'camera/:instanceId/:camId',
                 element: <CameraViewPage />,
             },
             {
@@ -44,6 +45,10 @@ export const routesConfig: RouteObject[] = [
             {
                 path: 'image-analysis',
                 element: <ImageAnalysisPage />
+            },
+            {
+                path: 'model-comparison',
+                element: <ModelComparisonPage />
             },
             {
                 path: '*',

@@ -1,22 +1,29 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
-// Component & Service
-import CameraView from '../../components/camera/CameraView/CameraView';
+// Component
+import CameraView, { type CameraViewHandle } from '../../components/camera/CameraView/CameraView';
+import EditConfigModal from '../../components/camera/EditConfigModal/EditConfigModal';
+import SharedHeader from '../../components/layout/SharedHeader/SharedHeader';
+
+// Service & Hooks
 import { cameraService } from '../../services/cameraService';
 import { kafkaService } from '../../services/kafkaService';
-import { useSystemStatus } from '../../hooks/useSystemStatus'; // <--- Hook Realtime
+import { useSystemStatus } from '../../hooks/useSystemStatus';
 import { useNotification } from '../../context/NotificationContext';
+
+// Types
 import type { Camera } from '../../types/camera';
 
 const CameraViewPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { instanceId, camId } = useParams<{ instanceId: string; camId: string }>();
   const navigate = useNavigate();
   const { notify } = useNotification();
 
-  // Gọi Hook Realtime
+  // Hook Realtime
   const { systemStatus, cameraStatuses } = useSystemStatus();
 
+  // --- STATE ---
   const [camera, setCamera] = useState<Camera | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -24,34 +31,54 @@ const CameraViewPage: React.FC = () => {
   const [isKafkaEnabled, setIsKafkaEnabled] = useState<boolean>(false);
   const [isToggling, setIsToggling] = useState<boolean>(false);
 
-  // --- INITIAL FETCH (HTTP) ---
+  // State Config Modal
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [snapshotUrl, setSnapshotUrl] = useState('');
+
+
+  const currentInstanceDisplay = [{
+    instance_id: instanceId || 'unknown',
+    // ip_address: (camera as any).node_ip || 'unknown',
+    port: 0,
+    status: 'online'
+  }];
+  // State Hover nút Config
+  const [isConfigHover, setIsConfigHover] = useState(false);
+
+  const cameraRef = useRef<CameraViewHandle>(null);
+
+  // --- INITIAL FETCH (ĐÃ SỬA LOGIC LẤY INSTANCE ID) ---
   useEffect(() => {
-    if (!id) return;
+    if (!instanceId || !camId) return;
 
     const initData = async () => {
       try {
         setLoading(true);
-        // 1. Lấy thông tin Camera
-        const camData = await cameraService.getById(id);
+        const camData = await cameraService.getById(camId, instanceId);
+
         if (camData) {
-            setCamera({
-                ...camData,
-                id: camData.camera_id,
-                name: camData.camera_id,
-                isLive: camData.status === 'running' || camData.status === 'starting'
-            });
+          setCamera({
+            ...camData,
+            node_id: instanceId,
+            id: camData.camera_id || camId,
+            node_ip: (camData as any).node_ip || '',
+            name: camData.name || camId,
+            isLive: camData.status === 'running'
+          } as any);
+
+          // Lấy Kafka status
+          try {
+            const kafkaData = await kafkaService.status(instanceId);
+            setIsKafkaEnabled(kafkaData.status === 'running');
+          } catch (e) { }
+
         } else {
-            notify("Camera not found!", "error");
-            navigate('/camera');
+          notify("Camera not found", "error");
+          navigate('/camera');
         }
-
-        // 2. Lấy trạng thái Kafka
-        const kafkaData = await kafkaService.status();
-        setIsKafkaEnabled(kafkaData.status === 'running' || kafkaData.is_active === true);
-
       } catch (error) {
-        console.error("Init error:", error);
-        notify("Failed to load camera details", "error");
+        console.error(error);
+        notify("Failed to load camera", "error");
         navigate('/camera');
       } finally {
         setLoading(false);
@@ -59,160 +86,168 @@ const CameraViewPage: React.FC = () => {
     };
 
     initData();
-  }, [id, navigate, notify]);
+  }, [instanceId, camId, navigate, notify]); // Dependencies thay đổi
 
-  // --- REAL-TIME SYNC (WebSocket) ---
-  // --- REAL-TIME SYNC (WebSocket) ---
+  // --- REAL-TIME SYNC ---
   useEffect(() => {
-    // 1. Sync Kafka (Giữ nguyên)
+
     if (systemStatus?.kafka) {
-        setIsKafkaEnabled(systemStatus.kafka.status === 'running');
+      setIsKafkaEnabled(systemStatus.kafka.status === 'running');
     }
 
-    // 2. Sync Camera Status (LOGIC MỚI QUAN TRỌNG)
-    if (cameraStatuses && id) {
-        // Tìm xem camera hiện tại còn tồn tại trong hệ thống không
-        const update = cameraStatuses.find(s => s.camera_id === id);
-        
-        if (update) {
-            // TRƯỜNG HỢP A: Camera còn sống -> Cập nhật trạng thái
-            const newIsLive = update.status === 'running' || update.status === 'starting';
-            
-            if (camera?.status !== update.status || camera?.isLive !== newIsLive) {
-                setCamera(prev => prev ? ({
-                    ...prev,
-                    status: update.status,
-                    isLive: newIsLive
-                }) : null);
-            }
-        } else {
-            // TRƯỜNG HỢP B: Camera đã biến mất khỏi danh sách (Bị xóa)
-            // Chỉ redirect nếu camera đã load xong lần đầu (để tránh redirect nhầm khi mới vào chưa sync kịp)
-            if (camera && !loading) {
-                console.warn(`Camera ${id} no longer exists. Redirecting...`);
-                notify("Camera has been removed by system!", "warning");
-                navigate('/camera'); // Đẩy về trang quản lý
-            }
+    // 2. Sync Camera Status
+    if (cameraStatuses && camId) {
+      const update = cameraStatuses.find(s => s.camera_id === camId);
+      if (update) {
+        const newIsLive = update.status === 'running' || update.status === 'starting';
+        if (camera?.status !== update.status || camera?.isLive !== newIsLive) {
+          setCamera(prev => prev ? ({ ...prev, status: update.status, isLive: newIsLive }) : null);
         }
+      }
+      // Logic xóa camera realtime (nếu cần)
     }
-  }, [systemStatus, cameraStatuses, camera, id, loading, navigate, notify]);
-  // --- HANDLER TOGGLE KAFKA ---
+  }, [systemStatus, cameraStatuses, camera, camId]);
+
+  // --- HANDLERS ---
+
   const handleToggleKafka = async () => {
     if (isToggling) return;
-    const newState = !isKafkaEnabled;
     setIsToggling(true);
     try {
-        await kafkaService.toggle(newState);
-        setIsKafkaEnabled(newState);
-    } catch (error) {
-        console.error("Failed to toggle Kafka", error);
-        notify("Failed to connect to Kafka System", "error");
+      const newState = !isKafkaEnabled;
+      // Lấy instanceId từ camera state (đã lưu ở bước init)
+      const instanceId = (camera as any)?.node_id || 'default';
+
+      await kafkaService.toggle(instanceId, newState);
+
+      setIsKafkaEnabled(newState);
+      notify(`Kafka on ${instanceId} turned ${newState ? 'ON' : 'OFF'}`, "success");
+    } catch (e) {
+      notify("Kafka toggle failed", "error");
     } finally {
-        setIsToggling(false);
+      setIsToggling(false);
+    }
+  };
+
+  const handleOpenConfig = () => {
+    if (cameraRef.current) {
+      const url = cameraRef.current.getSnapshot();
+      setSnapshotUrl(url);
+    }
+    setIsConfigOpen(true);
+  };
+
+  const handleConfigUpdate = (updatedCamera: Camera) => {
+    setCamera(prev => ({ ...prev, ...updatedCamera }));
+  };
+
+  const handleDeleteCamera = async (cameraId: string) => {
+    try {
+      // Lấy instanceId chuẩn xác
+      const instanceId = (camera as any)?.node_id || 'default';
+
+      await cameraService.delete(instanceId, cameraId);
+
+      setIsConfigOpen(false);
+      navigate('/camera');
+      notify("Camera deleted successfully", "success");
+    } catch (error) {
+      notify("Failed to delete camera", "error");
     }
   };
 
   // --- RENDER ---
   if (loading) return (
-    <div style={{ color: '#666', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px'}}>
-            <div style={styles.spinner}></div>
-            <span>Loading camera info...</span>
-        </div>
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#6b7280' }}>
+      Loading camera details...
     </div>
   );
 
   if (!camera) return null;
 
   return (
-    <div style={styles.container}>
-      
+    <div style={inlineStyles.container}>
+
       {/* HEADER */}
-      <header style={styles.header}>
-        <div style={styles.titleGroup}>
-          <h1 style={styles.title}>Camera Detail</h1>
-          <p style={{ color: '#6b7280', fontSize: '14px', margin: 0 }}>
-             Monitor and configure individual camera
-          </p>
-        </div>
+      <SharedHeader
+        title={`Camera: ${camera.name}`}
+        subtitle={camera.isLive ? "● LIVE STREAMING" : "Offline"}
+        onBack={() => navigate('/camera')}
+        instances={currentInstanceDisplay as any}
+        selectedInstanceId={instanceId || 'default'}
+        onInstanceChange={() => { /* No-op hoặc notify("Cannot change backend in detail view") */ }}
+        onRefreshInstances={() => { }}
+        kafkaState={{
+          isEnabled: isKafkaEnabled,
+          isToggling: isToggling,
+          onToggle: handleToggleKafka
+        }}
+      >
+        <button
+          onClick={handleOpenConfig}
+          onMouseEnter={() => setIsConfigHover(true)}
+          onMouseLeave={() => setIsConfigHover(false)}
+          style={{
+            ...inlineStyles.configBtn,
+            backgroundColor: isConfigHover ? '#ffffff' : '#e5e7eb',
+            borderColor: isConfigHover ? '#9ca3af' : '#d1d5db',
+            boxShadow: isConfigHover ? '0 2px 5px rgba(0,0,0,0.05)' : 'none'
+          }}
+        >
+          ⚙ Config
+        </button>
+      </SharedHeader>
 
-        <div style={styles.headerActions}>
-          <div style={styles.kafkaControl}>
-            <span style={styles.kafkaLabel}>Kafka Stream</span>
-            <div 
-                style={{
-                    ...styles.switchBase,
-                    backgroundColor: isKafkaEnabled ? '#f97316' : '#cbd5e1',
-                    opacity: isToggling ? 0.6 : 1,
-                    cursor: isToggling ? 'not-allowed' : 'pointer'
-                }}
-                onClick={handleToggleKafka}
-            >
-                <div style={{
-                    ...styles.switchKnob,
-                    transform: isKafkaEnabled ? 'translateX(18px)' : 'translateX(0)' 
-                }} />
-            </div>
-          </div>
-
-          <div style={styles.userAvatar}>
-            <img src="/logo.jpg" alt="User" style={styles.avatarImg} />
-          </div>
-        </div>
-      </header>
-
-      {/* VIEW */}
-      <div style={{ flex: 1, position: 'relative', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          <CameraView
-            camera={camera}
-            onBack={() => navigate('/camera')}
-          />
+      {/* MAIN VIEWPORT */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+        <CameraView
+          ref={cameraRef}
+          camera={camera}
+          onBack={() => navigate('/camera')}
+        />
       </div>
 
-      <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+      {/* CONFIG MODAL */}
+      {isConfigOpen && (
+        <EditConfigModal
+          isOpen={isConfigOpen}
+          onClose={() => setIsConfigOpen(false)}
+          camera={camera}
+          // Lấy instanceId từ camera object (đã được gán ở bước fetch trước đó)
+          instanceId={(camera as any).node_id || 'default'}
+          onUpdate={handleConfigUpdate}
+          onDelete={handleDeleteCamera}
+          snapshotUrl={snapshotUrl}
+        />
+      )}
+
     </div>
   );
 };
 
 // --- STYLES ---
-const styles: { [key: string]: React.CSSProperties } = {
+const inlineStyles: { [key: string]: React.CSSProperties } = {
   container: {
-    padding: '32px', backgroundColor: '#f8f9fa', height: '100vh',
-    boxSizing: 'border-box', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+    padding: '32px',
+    backgroundColor: '#f8f9fa',
+    height: '100vh',
+    boxSizing: 'border-box',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden'
   },
-  header: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid #e5e7eb', flexShrink: 0,
-  },
-  titleGroup: { display: 'flex', flexDirection: 'column' },
-  title: { fontSize: '28px', fontWeight: '700', color: '#1f2937', margin: 0 },
-  headerActions: { display: 'flex', alignItems: 'center', gap: '20px' },
-  
-  kafkaControl: {
-    display: 'flex', alignItems: 'center', gap: '12px',
-    backgroundColor: 'white', padding: '8px 16px', borderRadius: '24px',
-    border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-  },
-  kafkaLabel: { fontSize: '14px', fontWeight: '600', color: '#374151' },
-  
-  switchBase: {
-    width: '40px', height: '22px', borderRadius: '34px', position: 'relative',
-    transition: 'background-color 0.3s', display: 'flex', alignItems: 'center',
-    padding: '2px', boxSizing: 'border-box'
-  },
-  switchKnob: {
-    width: '16px', height: '16px', backgroundColor: 'white',
-    borderRadius: '50%', boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-    transition: 'transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)', 
-  },
-  userAvatar: {
-    width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#e5e7eb',
-    overflow: 'hidden', cursor: 'pointer', border: '2px solid #fff', boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-  },
-  avatarImg: { width: '100%', height: '100%', objectFit: 'cover' },
-  spinner: {
-    width: '40px', height: '40px', border: '4px solid #e5e7eb', borderTop: '4px solid #3b82f6', 
-    borderRadius: '50%', animation: 'spin 1s linear infinite'
+  configBtn: {
+    padding: '6px 12px',
+    background: '#e5e7eb',
+    border: '1px solid #d1d5db',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontWeight: '600',
+    color: '#374151',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
+    transition: 'all 0.2s ease',
   }
 };
 

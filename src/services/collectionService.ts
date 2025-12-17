@@ -1,8 +1,9 @@
+// src/services/collectionService.ts
 import axios from 'axios';
+import { getAppConfig } from './config';
 
-// Cấu hình URL API (Nên đưa vào biến môi trường)
-// const API_BASE_URL = 'https://vec.doca.love/v1'; 
-const API_BASE_URL = '/vec-api'
+// 1. Helper lấy config mới nhất mỗi khi gọi hàm
+const getConfig = () => getAppConfig();
 
 export interface CollectionConfig {
   name: string;
@@ -14,14 +15,18 @@ export interface CollectionConfig {
 export const collectionService = {
   // Tạo collection mới
   create: async (config: CollectionConfig) => {
-    const response = await axios.post(`${API_BASE_URL}/collections`, config);
+    // Lấy vecBaseUrl từ config (Thay thế cho const API_BASE_URL cũ)
+    const { vecBaseUrl } = getConfig();
+    
+    const response = await axios.post(`${vecBaseUrl}/collections`, config);
     return response.data;
   },
 
-  // Lấy danh sách collection (Để hiển thị gợi ý - Optional)
+  // Lấy danh sách collection
   getAll: async () => {
-    // Giả sử có API này, nếu chưa có thì bạn bỏ qua hàm này
-    const response = await axios.get(`${API_BASE_URL}/collections`);
-    return response.data; // Mong đợi trả về mảng tên collection
+    const { vecBaseUrl } = getConfig();
+    
+    const response = await axios.get(`${vecBaseUrl}/collections`);
+    return response.data;
   }
 };

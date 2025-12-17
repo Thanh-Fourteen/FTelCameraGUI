@@ -24,7 +24,9 @@ export interface CameraSettings {
   polygon: number[][];
   plot_mode: string;
   alert_mode: string;
-  // Thêm trường config (dynamic key)
+  
+  // THÊM DÒNG NÀY:
+  model?: string; 
   config: Record<string, Record<string, any>>; 
 }
 
@@ -43,4 +45,14 @@ export interface Camera extends CreateCameraPayload {
   output_topic: string;
   isLive?: boolean;
   thumbnailUrl?: string;
+
+  node_id?: string;
+  node_ip?: string;    
+  ip_address?: string;
+  
+  internal_port?: number;
+  public_port?: number;   
+  
+  stream_url?: string;    
+
 }

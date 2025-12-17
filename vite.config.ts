@@ -18,7 +18,7 @@ export default defineConfig({
     // allowedHosts: ['app.doca.love'],
     proxy: {
       '/api': {
-        target: "http://192.168.2.130:5171",
+        target: "http://72.49.200.123:48397",
         changeOrigin: true,
         secure: false,
       },

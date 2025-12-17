@@ -1,232 +1,258 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// --- COMPONENTS ---
+// Components
+import SharedHeader from '../../components/layout/SharedHeader/SharedHeader';
 import CameraCard from '../../components/camera/CameraCard/CameraCard';
-import AddCameraModal from '../../components/camera/AddCameraModal/AddCameraModal';
+import AddCameraModal from '../../components/camera/AddCameraModal/AddCameraModal'; // <-- Uncomment khi có Modal
 
-// --- SERVICES & HOOKS ---
+// Services & Hooks
+import { instanceService, type VastInstance } from '../../services/instanceService';
 import { cameraService } from '../../services/cameraService';
 import { kafkaService } from '../../services/kafkaService';
-import { useSystemStatus } from '../../hooks/useSystemStatus'; // <--- Hook Realtime
 import { useNotification } from '../../context/NotificationContext';
-import type { Camera, CreateCameraPayload } from '../../types/camera';
 
-// --- STYLES ---
-import styles from './CardManager.module.css';
+// Types
+import type { Camera } from '../../types/camera';
 
 const CardManager: React.FC = () => {
   const navigate = useNavigate();
   const { notify } = useNotification();
 
-  // 1. Gọi Hook Realtime (Lắng nghe toàn bộ hệ thống)
-  const { systemStatus, cameraStatuses } = useSystemStatus();
-
-  // --- STATE ---
+  // --- STATE DATA ---
+  const [instances, setInstances] = useState<VastInstance[]>([]);
   const [cameras, setCameras] = useState<Camera[]>([]);
-  const [loadingCameras, setLoadingCameras] = useState<boolean>(true);
-  
-  // State Kafka & Toggle
-  const [isKafkaEnabled, setIsKafkaEnabled] = useState<boolean>(false);
-  const [isToggling, setIsToggling] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
 
-  // Modal
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // --- STATE UI CONTROL ---
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string | 'all'>(() => {
+    const saved = localStorage.getItem('last_selected_instance');
+    return saved || 'all';
+  });
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false); // State mở modal thêm cam
 
-  // --- INITIAL FETCH (HTTP) ---
-  useEffect(() => {
-    const initData = async () => {
-      try {
-        setLoadingCameras(true);
-        // Lấy danh sách camera ban đầu
-        const data = await cameraService.getAll();
-        
-        const mapped = data.map((c: any) => ({
-          ...c,
-          id: c.camera_id,
-          name: c.camera_id,
-          // Status ban đầu lấy từ DB
-          isLive: c.status === 'running' || c.status === 'starting',
-          thumbnailUrl: c.thumbnailUrl
-        }));
-        setCameras(mapped);
+  // --- STATE KAFKA ---
+  const [isKafkaEnabled, setIsKafkaEnabled] = useState(false);
+  const [isTogglingKafka, setIsTogglingKafka] = useState(false);
 
-        // Lấy trạng thái Kafka ban đầu (để nút không bị sai trước khi WS kết nối)
-        const kafkaData = await kafkaService.status();
-        const isRunning = kafkaData.status === 'running' || kafkaData.is_active === true;
-        setIsKafkaEnabled(isRunning);
+  const handleInstanceChange = (val: string | 'all') => {
+    setSelectedInstanceId(val);
+    // Lưu ngay vào LocalStorage
+    localStorage.setItem('last_selected_instance', val);
+  };
 
-      } catch (e) {
-        console.error("Init data failed", e);
-        notify("Failed to load initial data", "error");
-      } finally {
-        setLoadingCameras(false);
+
+  // --------------------------------------------------------
+  // 1. FETCH DANH SÁCH INSTANCES
+  // --------------------------------------------------------
+  const fetchInstances = useCallback(async () => {
+    try {
+      const data = await instanceService.getAll();
+      setInstances(data);
+      const savedId = localStorage.getItem('last_selected_instance');
+      if (savedId && savedId !== 'all') {
+        const exists = data.find(i => i.instance_id === savedId);
+        if (!exists) {
+          console.warn(`Instance ${savedId} no longer exists. Resetting to 'all'.`);
+          setSelectedInstanceId('all');
+          localStorage.setItem('last_selected_instance', 'all');
+        }
       }
-    };
 
-    initData();
+    } catch (error) {
+      notify("Failed to load backend nodes", "error");
+    }
   }, [notify]);
 
-  // --- REAL-TIME SYNC (WebSocket) ---
-  // --- REAL-TIME SYNC (WebSocket) ---
   useEffect(() => {
-    // 1. Đồng bộ Kafka Switch (Giữ nguyên)
-    if (systemStatus?.kafka) {
-        setIsKafkaEnabled(systemStatus.kafka.status === 'running');
+    fetchInstances();
+  }, [fetchInstances]);
+
+  // --------------------------------------------------------
+  // 2. FETCH CAMERAS
+  // --------------------------------------------------------
+  const fetchCameras = useCallback(async () => {
+    setLoading(true);
+    setCameras([]);
+    try {
+      let data: Camera[] = [];
+
+      if (selectedInstanceId === 'all') {
+        data = await cameraService.getAllAggregated();
+      } else {
+        data = await cameraService.getByInstance(selectedInstanceId);
+
+        // Check Kafka status nếu chọn instance cụ thể
+        try {
+          const status = await kafkaService.status(selectedInstanceId);
+          setIsKafkaEnabled(status.status === 'running' || status.is_active === true);
+        } catch (e) {
+          console.log("Could not fetch Kafka status:", e);
+        }
+      }
+
+      setCameras(data);
+
+    } catch (error) {
+      console.error("Failed to load cameras", error);
+      notify("Failed to load cameras", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedInstanceId, notify]);
+
+  useEffect(() => {
+    fetchCameras();
+  }, [fetchCameras]);
+
+  // --------------------------------------------------------
+  // 3. HANDLERS
+  // --------------------------------------------------------
+  const handleToggleKafka = async () => {
+    if (selectedInstanceId === 'all') {
+      notify("Please select a specific backend to toggle Kafka", "info");
+      return;
     }
 
-    // 2. ĐỒNG BỘ DANH SÁCH CAMERA (LOGIC MỚI)
-    if (cameraStatuses && Array.isArray(cameraStatuses)) {
-        // Thay vì chỉ update status, ta sẽ RE-SYNC lại toàn bộ danh sách
-        // Tuy nhiên, WS thường chỉ trả về status rút gọn (id, status, rtsp), thiếu thumbnail.
-        // Nên ta phải merge khéo léo:
-        
-        setCameras(prevCameras => {
-            // Tạo Map để tra cứu nhanh camera cũ
-            const prevMap = new Map(prevCameras.map(c => [c.id, c]));
-            
-            // Tạo danh sách mới từ dữ liệu WebSocket
-            const newCameras = cameraStatuses.map(wsCam => {
-                const oldCam = prevMap.get(wsCam.camera_id);
-                
-                // Nếu camera đã tồn tại -> Giữ lại thumbnail cũ, update status mới
-                if (oldCam) {
-                    const newIsLive = wsCam.status === 'running' || wsCam.status === 'starting';
-                    // Chỉ return object mới nếu có thay đổi (để tối ưu render)
-                    if (oldCam.status !== wsCam.status || oldCam.isLive !== newIsLive) {
-                        return { ...oldCam, status: wsCam.status, isLive: newIsLive };
-                    }
-                    return oldCam;
-                }
+    if (isTogglingKafka) return;
+    setIsTogglingKafka(true);
 
-                // Nếu camera mới tinh (do người khác thêm) -> Tạo object mới
-                return {
-                    id: wsCam.camera_id,
-                    name: wsCam.camera_id, // Hoặc wsCam.name nếu backend trả về
-                    rtsp_url: wsCam.rtsp_url,
-                    ws_port: wsCam.ws_port,
-                    status: wsCam.status,
-                    isLive: wsCam.status === 'running' || wsCam.status === 'starting',
-                    thumbnailUrl: undefined, // Mới thì chưa có ảnh
-                    settings: wsCam.settings || {}
-                } as Camera;
-            });
-
-            return newCameras;
-        });
+    try {
+      const newState = !isKafkaEnabled;
+      await kafkaService.toggle(selectedInstanceId, newState);
+      setIsKafkaEnabled(newState);
+      notify(`Kafka on ${selectedInstanceId} turned ${newState ? 'ON' : 'OFF'}`, "success");
+    } catch (error) {
+      notify("Failed to toggle Kafka", "error");
+    } finally {
+      setIsTogglingKafka(false);
     }
-  }, [systemStatus, cameraStatuses]);
-
-  // --- HANDLERS ---
+  };
 
   const handleCameraClick = (cam: Camera) => {
-    navigate(`/camera/${cam.id}`);
-  };
+    // 1. Lấy ID camera (cam_id)
+    const targetCamId = (cam as any).camera_id || cam.id;
 
-  const handleSaveNewCamera = async (payload: CreateCameraPayload) => {
-    try {
-      const newCameraData: any = await cameraService.create(payload);
-      // Thêm camera mới vào list ngay lập tức
-      const newCameraUI: Camera = {
-        ...newCameraData,
-        id: newCameraData.camera_id,
-        name: newCameraData.camera_id,
-        isLive: newCameraData.status === 'running',
-      };
-      setCameras(prev => [...prev, newCameraUI]);
-      
-      setIsModalOpen(false);
-      notify("Camera created successfully", "success");
-    } catch (error: any) {
-      const msg = error.response?.data?.detail || "Failed to create camera.";
-      notify(msg, "error");
+    const targetInstanceId = (cam as any).node_id ||
+      (selectedInstanceId !== 'all' ? selectedInstanceId : 'default');
+
+    if (!targetCamId || !targetInstanceId) {
+      notify("Missing Camera ID or Node ID", "error");
+      return;
+    }
+
+    // 3. Điều hướng theo URL mới
+    navigate(`/camera/${targetInstanceId}/${targetCamId}`);
+  };
+  // Mở modal thêm camera
+  const handleAddCameraClick = () => {
+    if (selectedInstanceId === 'all') {
+      // Nếu đang xem tất cả, yêu cầu user chọn backend cụ thể trước
+      // Hoặc bạn có thể mở modal và cho user chọn backend trong modal đó
+      notify("Please select a specific backend instance to add camera", "warning");
+    } else {
+      setIsAddModalOpen(true); // <-- Bật cái này khi có modal
+      // notify("Open Add Camera Modal (Coming Soon)", "info");
     }
   };
 
-  const handleToggleKafka = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newState = e.target.checked;
-    setIsToggling(true);
-    
-    try {
-        // Gọi API Toggle
-        await kafkaService.toggle(newState);
-        // UI sẽ tự cập nhật nhờ useEffect lắng nghe WebSocket ở trên
-        // Nhưng ta set tạm state để phản hồi nhanh (Optimistic UI)
-        setIsKafkaEnabled(newState);
-        notify(`Kafka ${newState ? 'Enabled' : 'Disabled'}`, "success");
-    } catch (error) {
-        console.error("Toggle Kafka failed", error);
-        notify("Failed to toggle Kafka", "error");
-        setIsKafkaEnabled(!newState); // Revert nếu lỗi
-    } finally {
-        setIsToggling(false);
-    }
+  // Xử lý sau khi thêm thành công
+  const handleCameraAdded = () => {
+    setIsAddModalOpen(false);
+    fetchCameras(); // Reload danh sách
+    notify("Camera added successfully", "success");
   };
 
-  // --- RENDER ---
+  // --------------------------------------------------------
+  // RENDER
+  // --------------------------------------------------------
   return (
-    <div className={styles.container}>
-      
-      <header className={styles.header}>
-        <div className={styles.titleGroup}>
-            <h1 className={styles.title}>Camera Management</h1>
-            <p style={{color: '#6b7280', fontSize: '14px', margin: 0}}>Manage camera list and status</p>
-        </div>
-        
-        <div className={styles.headerActions}>
-           {/* Nút Kafka */}
-           <div className={styles.kafkaControl}>
-              <span className={styles.kafkaLabel}>Kafka Stream</span>
-              <label className={styles.switch}>
-                  <input 
-                    type="checkbox" 
-                    checked={isKafkaEnabled}
-                    onChange={handleToggleKafka}
-                    disabled={isToggling} 
-                  />
-                  <span className={styles.slider}></span>
-              </label>
-           </div>
+    <div style={styles.container}>
 
-           <div className={styles.userAvatar}>
-              <img src="/logo.jpg" alt="User" />
-           </div>
-        </div>
-      </header>
+      <SharedHeader
+        title="Camera Management"
+        subtitle={selectedInstanceId === 'all'
+          ? `All Cameras (${cameras.length})`
+          : `Cameras on ${instances.find(i => i.instance_id === selectedInstanceId)?.name || selectedInstanceId} (${cameras.length})`
+        }
+        instances={instances}
+        selectedInstanceId={selectedInstanceId}
+        onInstanceChange={(val) => handleInstanceChange(val as string | 'all')}
+        onRefreshInstances={fetchInstances}
+        kafkaState={{
+          isEnabled: isKafkaEnabled,
+          isToggling: isTogglingKafka,
+          onToggle: handleToggleKafka
+        }}
+      >
+      </SharedHeader>
 
-      {/* Camera Grid */}
-      {loadingCameras ? (
-          <div style={{
-              textAlign: 'center', marginTop: '60px', color: '#6b7280',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px'
-          }}>
-              <div className={styles.spinner}></div>
-              <span>Loading cameras...</span>
+      <div style={styles.content}>
+        {loading ? (
+          <div style={styles.loading}>
+            <div style={styles.spinner}></div>
+            <p>Loading cameras...</p>
           </div>
-      ) : (
-          <div className={styles.cameraGrid}>
-              {cameras.map((cam) => (
+        ) : (
+          <div style={styles.grid}>
+
+            {/* CARD THÊM MỚI (Luôn hiển thị đầu tiên) */}
+
+            {/* DANH SÁCH CAMERA */}
+            {cameras && Array.isArray(cameras) && cameras.map((cam, index) => (
+              <div
+                key={cam.camera_id ? `${cam.camera_id}-${index}` : index}
+                onClick={() => handleCameraClick(cam)}
+              >
                 <CameraCard
-                  key={cam.id}
                   camera={cam}
+                  nodeName={selectedInstanceId === 'all' ? (cam as any).node_name : undefined}
                   onClick={() => handleCameraClick(cam)}
                 />
-              ))}
-              <CameraCard type="add" onClick={() => setIsModalOpen(true)} />
+              </div>
+            ))}
+            <CameraCard
+              type="add"
+              onClick={handleAddCameraClick}
+            />
+
+
+            {/* Empty State nếu không có cam nào (nhưng vẫn hiện nút Add) */}
+            {cameras.length === 0 && (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#9ca3af', padding: 20 }}>
+                No cameras found. Use the "+" card to create one.
+              </div>
+            )}
           </div>
+        )}
+      </div>
+
+      {/* MODAL THÊM CAMERA (Placeholder) */}
+      {isAddModalOpen && (
+        <AddCameraModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          instanceId={selectedInstanceId as string}
+          onSuccess={handleCameraAdded}
+        />
       )}
 
-      {/* Modal */}
-      <AddCameraModal 
-         isOpen={isModalOpen} 
-         onClose={() => setIsModalOpen(false)} 
-         onSave={handleSaveNewCamera} 
-      />
-      
-      {/* CSS Spinner Animation (Inline for simplicity) */}
-      <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };
+
+// --- STYLES ---
+const styles: { [key: string]: React.CSSProperties } = {
+  container: { padding: '32px', backgroundColor: '#f8f9fa', minHeight: '100vh', display: 'flex', flexDirection: 'column' },
+  content: { flex: 1, marginTop: '20px' },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '24px' },
+  refreshBtn: { padding: '6px 12px', borderRadius: '6px', border: '1px solid #d1d5db', background: 'white', cursor: 'pointer', fontWeight: '500' },
+  loading: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px', color: '#6b7280' },
+  spinner: { width: '40px', height: '40px', border: '4px solid #e5e7eb', borderTop: '4px solid #3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '10px' },
+};
+
+const styleSheet = document.createElement("style");
+styleSheet.innerText = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`;
+document.head.appendChild(styleSheet);
 
 export default CardManager;

@@ -1,0 +1,183 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+  background-color: transparent;
+}
+
+/* LEFT SECTION */
+.leftSection {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.backBtn {
+  background: white;
+  border: 1px solid #d1d5db;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #374151;
+  transition: all 0.2s;
+}
+.backBtn:hover {
+  background: #f3f4f6;
+}
+
+.titleGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.subtitle {
+  color: #6b7280;
+  font-size: 14px;
+  margin: 0;
+}
+
+/* RIGHT SECTION */
+.rightSection {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.customActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Vách ngăn giữa nút riêng và nút Kafka */
+  padding-right: 20px;
+  border-right: 1px solid #e5e7eb;
+}
+
+/* KAFKA STYLES */
+.kafkaControl {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid #e5e7eb;
+}
+
+.kafkaLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.switchBase {
+  width: 36px;
+  height: 20px;
+  background-color: #cbd5e1;
+  border-radius: 20px;
+  position: relative;
+  transition: background-color 0.3s;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+}
+
+.switchBase.active {
+  background-color: #f97316;
+}
+
+.switchKnob {
+  width: 16px;
+  height: 16px;
+  background-color: white;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.knobActive {
+  transform: translateX(16px);
+}
+
+/* AVATAR */
+.userAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.userAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.centerSection {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.instanceSelector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: #f3f4f6;
+    padding: 4px 8px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+}
+
+.select {
+    border: none;
+    background: transparent;
+    font-weight: 600;
+    color: #1f2937;
+    outline: none;
+    cursor: pointer;
+    max-width: 200px;
+}
+
+.addBtn {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: none;
+    background-color: #3b82f6;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.addBtn:hover {
+    background-color: #2563eb;
+}
+
+/* Update Kafka disabled state */
+.switchBase.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #94a3b8;
+}
