@@ -54,7 +54,7 @@ def get_ai_template(cam_id, topic_in, topic_out):
                 "VERSION": 1,
                 "THRESHOLD": 0.4,
                 "BATCH_SIZE": 4,
-                "CLASSES_NAME": '{"0":"head","1":"body","2":"face"}'
+                "CLASSES_NAME": '{"0":"head","1":"body","2":"cat","3":"dog"}'
             },
             "networks": ["stream-kafka"]
         },

@@ -47,6 +47,7 @@ def get_module_schema():
                     "type": "boolean",
                     "default": False
                 },
+                {"key": "FRAME_RATE", "label": "Frame Rate", "type": "number", "default": 27},
                 {
                     "key": "OUTPUT_FPS",
                     "label": "Output FPS",
