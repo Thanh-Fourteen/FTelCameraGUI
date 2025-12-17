@@ -70,7 +70,7 @@ const resolveModuleDependencies = (clickedId: string, currentSelected: string[])
 
 const EditConfigModal: React.FC<EditConfigModalProps> = ({
     isOpen, onClose, camera, onUpdate, onDelete, instanceId,
-    streamResolution = { width: 1920, height: 1080 }, snapshotUrl
+    streamResolution = { width: 854, height: 480 }, snapshotUrl
 }) => {
     const { notify } = useNotification();
 

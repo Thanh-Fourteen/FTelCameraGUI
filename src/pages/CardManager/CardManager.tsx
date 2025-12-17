@@ -159,6 +159,24 @@ const CardManager: React.FC = () => {
     }
   };
 
+  const handleDeleteCamera = async (cam: Camera) => {
+    const instanceId = (cam as any).node_id || selectedInstanceId;
+    const cameraId = (cam as any).camera_id || cam.id;
+
+    if (!instanceId || !cameraId) {
+      notify("Missing Instance ID or Camera ID for deletion", "error");
+      return;
+    }
+    try {
+      await cameraService.delete(instanceId, cameraId);
+      notify("Camera deleted successfully", "success");
+      fetchCameras(); // Reload danh sách sau khi xóa
+    } catch (error) {
+      let errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      notify(errorMessage, "error");
+    }
+  };
+
   // Xử lý sau khi thêm thành công
   const handleCameraAdded = () => {
     setIsAddModalOpen(false);
@@ -211,6 +229,7 @@ const CardManager: React.FC = () => {
                   camera={cam}
                   nodeName={selectedInstanceId === 'all' ? (cam as any).node_name : undefined}
                   onClick={() => handleCameraClick(cam)}
+                  onDelete={() => handleDeleteCamera(cam)} // Truyền hàm xóa tại đây
                 />
               </div>
             ))}

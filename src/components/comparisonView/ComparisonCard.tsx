@@ -72,7 +72,6 @@ const ComparisonCard: React.FC<ComparisonCardProps> = ({ camera, nodeName, onDel
                         {modelDisplay}
                     </span>
                 </div>
-                <button onClick={onDelete} style={styles.delBtn} title="Remove from comparison">🗑️</button>
             </div>
 
             <div style={styles.videoWrapper}>

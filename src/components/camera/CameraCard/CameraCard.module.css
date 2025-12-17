@@ -3,26 +3,74 @@
 .cameraCard {
   background: white;
   border-radius: 12px;
-  padding: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  aspect-ratio: 4/3;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Đổ bóng nhẹ hơn cho sang */
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: 1px solid #f0f0f0;
 }
 
-.cameraCard:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+/* Style cho Header mới */
+.cardHeader {
+  padding: 12px 16px; /* Giãn cách bên trong header */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #ffffff;
 }
 
-.addCard {
+.cameraTitle {
+  font-size: 15px; /* Tăng size chữ ID cho rõ */
+  font-weight: 700;
+  color: #111827;
+}
+
+.deleteBtn {
+  background: #fee2e2;
+  color: #ef4444;
+  border: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f5f7fa;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.deleteBtn:hover {
+  background: #fecaca;
+  color: #dc2626;
+}
+
+/* Các phần khác */
+.cardImageWrapper {
+  width: calc(100% - 24px); /* Tạo khoảng cách 2 bên lề cho ảnh */
+  margin: 0 auto; /* Căn giữa */
+  aspect-ratio: 16 / 9;
+  background-color: #f3f4f6;
+  border-radius: 8px; /* Bo góc nhẹ cho phần ảnh */
+  position: relative;
+  overflow: hidden;
+}
+
+.rtspLinkSmall {
+  font-size: 9px;
+  color: #9ca3af;
+  margin-top: 2px;
+  display: block;
+}
+
+/* Card Add */
+.addCard {
   border: 2px dashed #d1d5db;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
 }
 
 .addIcon {
@@ -69,12 +117,19 @@
   align-items: center;
   gap: 4px;
 }
+.footerInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px; /* Giãn cách giữa dòng ID và dòng RTSP */
+  flex: 1;
+  overflow: hidden;
+}
 
 .cardFooter {
+  padding: 16px; /* Tăng padding để giãn cách ID và RTSP với ảnh */
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 0 4px;
+  align-items: flex-end; /* Căn chỉ số status xuống dưới cùng */
 }
 
 .cameraName {
@@ -83,8 +138,8 @@
 }
 
 .statusIndicator {
-    /* Style chung cho icon status */
-    font-size: 14px;
+  margin-left: 12px;
+  font-size: 18px;
 }
 
 /* Các trạng thái cụ thể */
@@ -99,4 +154,46 @@
 
 .maintenance {
     color: #faad14;
+}
+
+.quickDeleteBtn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 24px;
+  height: 24px;
+  background-color: rgba(239, 68, 68, 0.85); /* Màu đỏ hơi trong suốt */
+  color: white;
+  border: none;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.quickDeleteBtn:hover {
+  background-color: rgb(220, 38, 38);
+  transform: scale(1.1);
+}
+
+/* RTSP link siêu nhỏ */
+.rtspLinkSmall {
+  font-size: 11px;
+  color: #9ca3af;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.cameraName {
+  font-weight: 600;
+  font-size: 13px;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

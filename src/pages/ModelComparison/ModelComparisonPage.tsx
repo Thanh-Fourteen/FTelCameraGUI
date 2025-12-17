@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import SharedHeader from '../../components/layout/SharedHeader/SharedHeader';
 import AddComparisonModal from '../../components/camera/AddComparisonModal/AddComparisonModal';
 import ComparisonCard from '../../components/comparisonView/ComparisonCard';
-import MultiLineFpsChart from '../../components/chart/MultiLineFpsChart'; // Component Chart mới
+import MultiLineFpsChart from '../../components/chart/MultiLineFpsChart';
 
 import { instanceService, type VastInstance } from '../../services/instanceService';
 import { cameraService } from '../../services/cameraService';
@@ -10,10 +10,8 @@ import { kafkaService } from '../../services/kafkaService';
 import { useNotification } from '../../context/NotificationContext';
 import type { Camera } from '../../types/camera';
 
-// Hàm sinh màu ngẫu nhiên nhưng cố định theo index hoặc id để đẹp mắt
 const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1'];
 const getColor = (index: number) => COLORS[index % COLORS.length];
-
 
 const MODEL_LABEL_MAP: Record<string, string> = {
     'yolov9_ensemble': 'Yolo V9',
@@ -21,10 +19,10 @@ const MODEL_LABEL_MAP: Record<string, string> = {
     'detection_ensemble': 'DOAI'
 };
 
-// Hàm helper để lấy tên hiển thị an toàn
 const getFriendlyModelName = (rawName: string) => {
     return MODEL_LABEL_MAP[rawName] || rawName || 'N/A';
 };
+
 const ModelComparisonPage: React.FC = () => {
     const { notify } = useNotification();
 
@@ -34,148 +32,149 @@ const ModelComparisonPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
 
     // State UI
-    const [selectedInstanceId, setSelectedInstanceId] = useState<string | 'all'>('all');
+    const [selectedInstanceId, setSelectedInstanceId] = useState<string>(() => {
+        return localStorage.getItem('last_selected_instance') || '';
+    });
+
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isKafkaEnabled, setIsKafkaEnabled] = useState(false);
+    const [isTogglingKafka, setIsTogglingKafka] = useState(false);
 
-    // --- LOGIC CHART UNIFIED ---
-    // Lưu trữ lịch sử FPS để vẽ: [{ time: 123, cam1: 30, cam2: 50 }, ...]
+    // --- LOGIC CHART ---
     const [chartData, setChartData] = useState<any[]>([]);
-
-    // Dùng Ref để lưu giá trị FPS mới nhất nhận được từ các cam (tránh re-render liên tục)
     const latestFpsRef = useRef<Record<string, number>>({});
 
-
-
-    // Reset chart khi danh sách camera thay đổi
     useEffect(() => {
         setChartData([]);
         latestFpsRef.current = {};
-    }, [cameras.length]); // Reset khi số lượng cam thay đổi
+    }, [cameras.length, selectedInstanceId]);
 
-    // Interval để update Chart (Sampling mỗi 1s)
     useEffect(() => {
         const interval = setInterval(() => {
             if (cameras.length === 0) return;
-
             setChartData(prev => {
                 const now = Date.now();
                 const newPoint: any = { time: now };
-
                 cameras.forEach(cam => {
                     const camId = cam.camera_id || (cam as any).id;
                     newPoint[camId] = latestFpsRef.current[camId] || 0;
                 });
-
                 const newHistory = [...prev, newPoint];
-
-                // GIỮ LẠI 60 ĐIỂM GẦN NHẤT (Nếu update 1s/lần thì tương đương 1 phút)
-                if (newHistory.length > 60) {
-                    return newHistory.slice(newHistory.length - 60);
-                }
-                return newHistory;
+                return newHistory.slice(-60);
             });
         }, 1000);
-
         return () => clearInterval(interval);
     }, [cameras]);
 
-    // Callback được gọi từ ComparisonCard
     const handleFpsUpdate = useCallback((cameraIdFromCard: string, fps: number) => {
-        // Log ra để kiểm tra nếu cần: console.log("FPS Update:", cameraIdFromCard, fps);
         latestFpsRef.current[cameraIdFromCard] = fps;
     }, []);
 
-    // --- Fetch Data Logic (Giữ nguyên) ---
+    // --- FETCH LOGIC ---
     const fetchInstances = useCallback(async () => {
         try {
             const data = await instanceService.getAll();
             setInstances(data);
+
+            // Nếu chưa có instanceId hoặc instance cũ không còn tồn tại, chọn cái đầu tiên
+            if (data.length > 0) {
+                const exists = data.find(i => i.instance_id === selectedInstanceId);
+                if (!selectedInstanceId || !exists) {
+                    const firstId = data[0].instance_id;
+                    setSelectedInstanceId(firstId);
+                    localStorage.setItem('last_selected_instance', firstId);
+                }
+            }
         } catch (e) { console.error(e); }
-    }, []);
+    }, [selectedInstanceId]);
 
     useEffect(() => { fetchInstances(); }, [fetchInstances]);
 
-    const fetchCameras = useCallback(async () => {
+    const fetchCamerasAndStatus = useCallback(async () => {
+        if (!selectedInstanceId || selectedInstanceId === 'all') return;
         setLoading(true);
-        // setCameras([]); // Không clear để tránh nháy giao diện
         try {
-            let data: Camera[] = [];
-            if (selectedInstanceId === 'all') {
-                data = await cameraService.getAllAggregated();
-            } else {
-                data = await cameraService.getByInstance(selectedInstanceId);
-                try {
-                    const status = await kafkaService.status(selectedInstanceId);
-                    setIsKafkaEnabled(status.status === 'running');
-                } catch (e) { }
-            }
+            const data = await cameraService.getByInstance(selectedInstanceId);
             setCameras(data);
+
+            const status = await kafkaService.status(selectedInstanceId);
+            setIsKafkaEnabled(status.status === 'running' || status.is_active === true);
         } catch (e) {
-            notify("Failed to load comparison cameras", "error");
+            console.error(e);
         } finally {
             setLoading(false);
         }
-    }, [selectedInstanceId, notify]);
+    }, [selectedInstanceId]);
 
-    useEffect(() => { fetchCameras(); }, [fetchCameras]);
+    useEffect(() => { fetchCamerasAndStatus(); }, [fetchCamerasAndStatus]);
 
-    // --- Handlers ---
-    const handleAddClick = () => {
-        if (selectedInstanceId === 'all') {
-            notify("Please select a specific backend instance to add camera", "warning");
-        } else {
-            setIsAddModalOpen(true);
-        }
-    };
-
-    const handleDeleteCamera = async (cam: Camera) => {
-        if (!window.confirm(`Delete comparison camera ${cam.name}?`)) return;
+    const handleToggleKafka = async () => {
+        if (!selectedInstanceId || isTogglingKafka) return;
+        setIsTogglingKafka(true);
         try {
-            const instanceId = (cam as any).node_id || selectedInstanceId;
-            await cameraService.delete(instanceId, cam.camera_id);
-
-            // Xóa data rác trong ref
-            delete latestFpsRef.current[cam.camera_id];
-
-            fetchCameras();
-            notify("Deleted", "success");
-        } catch (e) {
-            notify("Delete failed", "error");
+            const newState = !isKafkaEnabled;
+            await kafkaService.toggle(selectedInstanceId, newState);
+            setIsKafkaEnabled(newState);
+            notify(`Kafka service is now ${newState ? 'active' : 'inactive'}`, "success");
+        } catch (error) {
+            notify("Failed to toggle Kafka service", "error");
+        } finally {
+            setIsTogglingKafka(false);
         }
     };
 
     return (
         <div style={styles.container}>
             <SharedHeader
-                title="Model Comparison Arena"
-                subtitle="Benchmark multiple models in a unified timeline"
+                title="Model Arena"
+                subtitle="High-performance model benchmarking & comparison"
                 instances={instances}
                 selectedInstanceId={selectedInstanceId}
-                onInstanceChange={(val) => setSelectedInstanceId(val as string | 'all')}
+                onInstanceChange={(val) => {
+                    setSelectedInstanceId(val as string);
+                    localStorage.setItem('last_selected_instance', val as string);
+                }}
                 onRefreshInstances={fetchInstances}
-                kafkaState={{ isEnabled: isKafkaEnabled, isToggling: false, onToggle: () => { } }}
-            >
-                <button onClick={fetchCameras} style={styles.btn}>🔄 Refresh</button>
-            </SharedHeader>
+                kafkaState={{
+                    isEnabled: isKafkaEnabled,
+                    isToggling: isTogglingKafka,
+                    onToggle: handleToggleKafka
+                }}
+            />
 
-            {/* --- SECTION 1: METRICS CHART (UNIFIED) --- */}
-            {/* Chỉ hiển thị khi có ít nhất 1 camera */}
+            {/* --- INTRODUCTION SECTION --- */}
+            <div style={styles.introSection}>
+                <div style={styles.introContent}>
+                    <h2 style={styles.introTitle}>Welcome to the Performance Arena</h2>
+                    <p style={styles.introText}>
+                        This specialized environment allows you to <strong>benchmark multiple AI models</strong> side-by-side.
+                        By deploying different engines on the same RTSP stream, you can directly compare
+                        accuracy, inference latency, and throughput in real-time.
+                    </p>
+                    <ul style={styles.introList}>
+                        <li>🚀 <strong>Real-time Metrics:</strong> Monitor FPS stability across different architectures.</li>
+                        <li>📊 <strong>Unified Timeline:</strong> Compare model behaviors on the exact same video frames.</li>
+                        <li>⚙️ <strong>Easy Switching:</strong> Quickly toggle between Yolo V9, V12, and DOAI engines.</li>
+                    </ul>
+                </div>
+            </div>
+
+            {/* --- METRICS CHART --- */}
             {cameras.length > 0 && (
                 <div style={styles.chartSection}>
-                    <h3 style={styles.sectionTitle}>📈 Live Performance Metrics</h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <h3 style={styles.sectionTitle}>📈 Live Performance Metrics</h3>
+                        <span style={styles.instanceBadge}>Node: {selectedInstanceId}</span>
+                    </div>
                     <MultiLineFpsChart
                         data={chartData}
                         lines={cameras.map((c, idx) => {
-                            const modelName =
-                                c.settings?.config?.['pythera_detection']?.['MODEL_NAME'] ||
-                                'N/A';
-
+                            const modelName = c.settings?.config?.['pythera_detection']?.['MODEL_NAME'] || 'N/A';
                             const friendlyName = getFriendlyModelName(modelName);
                             return {
                                 key: c.camera_id,
                                 color: getColor(idx),
-                                label: `${c.name || c.camera_id} - [${friendlyName}]`
+                                label: `${c.name || c.camera_id} (${friendlyName})`
                             };
                         })}
                         height={250}
@@ -183,50 +182,64 @@ const ModelComparisonPage: React.FC = () => {
                 </div>
             )}
 
-            {/* --- SECTION 2: CAMERA GRID --- */}
+            {/* --- CAMERA GRID --- */}
             <div style={styles.grid}>
-                {/* Card Add */}
-
-
-                {/* List Cameras */}
                 {cameras.map((cam, idx) => (
                     <ComparisonCard
                         key={cam.camera_id}
                         camera={cam}
-                        nodeName={selectedInstanceId === 'all' ? (cam as any).node_name : undefined}
-                        color={getColor(idx)} // Truyền màu xuống để card hiển thị border
-                        onFps={handleFpsUpdate} // Truyền callback lấy FPS
-                        onDelete={() => handleDeleteCamera(cam)}
+                        color={getColor(idx)}
+                        onFps={handleFpsUpdate}
+                        onDelete={() => {
+                        }}
                     />
                 ))}
-                <div style={styles.addCard} onClick={handleAddClick}>
-                    <div style={{ fontSize: '40px' }}>+</div>
-                    <div>Add Model</div>
+
+                <div style={styles.addCard} onClick={() => setIsAddModalOpen(true)}>
+                    <div style={{ fontSize: '40px', marginBottom: '8px' }}>+</div>
+                    <div style={{ fontWeight: 600 }}>Deploy New Model</div>
+                    <div style={{ fontSize: '12px', opacity: 0.7 }}>Add engine for benchmarking</div>
                 </div>
             </div>
 
-            <AddComparisonModal
-                isOpen={isAddModalOpen}
-                onClose={() => setIsAddModalOpen(false)}
-                onSuccess={fetchCameras}
-                instanceId={selectedInstanceId as string}
-            />
+            {selectedInstanceId && (
+                <AddComparisonModal
+                    isOpen={isAddModalOpen}
+                    onClose={() => setIsAddModalOpen(false)}
+                    onSuccess={fetchCamerasAndStatus}
+                    instanceId={selectedInstanceId}
+                />
+            )}
         </div>
     );
 };
 
 const styles = {
     container: { padding: '32px', background: '#f8f9fa', minHeight: '100vh', display: 'flex', flexDirection: 'column' as const, gap: '24px' },
-    btn: { padding: '6px 12px', borderRadius: '6px', border: '1px solid #ccc', background: 'white', cursor: 'pointer' },
 
-    chartSection: { background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
-    sectionTitle: { margin: '0 0 16px 0', fontSize: '18px', color: '#111827', fontWeight: '600' },
+    // Intro Section Styles
+    introSection: {
+        background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+        padding: '30px',
+        borderRadius: '16px',
+        color: 'white',
+        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
+    },
+    introContent: { maxWidth: '900px' },
+    introTitle: { margin: '0 0 12px 0', fontSize: '24px', fontWeight: '700', color: '#3b82f6' },
+    introText: { margin: '0 0 20px 0', fontSize: '15px', lineHeight: '1.6', color: '#94a3b8' },
+    introList: { display: 'flex', gap: '20px', listStyle: 'none', padding: 0, fontSize: '13px' },
 
-    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' },
+    chartSection: { background: 'white', padding: '24px', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' },
+    sectionTitle: { margin: 0, fontSize: '18px', color: '#111827', fontWeight: '600' },
+    instanceBadge: { fontSize: '11px', background: '#f1f5f9', padding: '4px 10px', borderRadius: '20px', color: '#64748b', fontWeight: 600 },
+
+    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '24px' },
     addCard: {
-        border: '2px dashed #ccc', borderRadius: '8px', display: 'flex', flexDirection: 'column' as const,
-        alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#888', minHeight: '260px', background: 'rgba(0,0,0,0.02)',
-        transition: 'all 0.2s'
+        border: '2px dashed #cbd5e1', borderRadius: '16px', display: 'flex', flexDirection: 'column' as const,
+        alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', minHeight: '280px', background: '#fff',
+        transition: 'all 0.2s ease',
+        '&:hover': { borderColor: '#3b82f6', color: '#3b82f6', background: '#f0f7ff' }
     }
 };
 

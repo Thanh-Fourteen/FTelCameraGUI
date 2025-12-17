@@ -16,37 +16,37 @@ export default defineConfig({
     host: true,
     port: 5173,
     // allowedHosts: ['app.doca.love'],
-    proxy: {
-      '/api': {
-        target: "http://192.168.2.130:31313",
-        changeOrigin: true,
-        secure: false,
-      },
-      '/vec-api': {
-        target: "http://192.168.2.130:8686/v1",
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/vec-api/, '')
-      },
-      '/fra-api': {
-        target: "http://192.168.2.130:2022",
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/fra-api/, '')
-      },
-      '/det-api': {
-        target: "http://192.168.2.130:2468",
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/det-api/, '')
-      },
-      '/sys-ws': {
-        target: 'ws://192.168.2.130:5171',
-        ws: true,
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/sys-ws/, '')
-      }
-    }
+    // proxy: {
+    //   '/api': {
+    //     target: "http://192.168.2.130:31313",
+    //     changeOrigin: true,
+    //     secure: false,
+    //   },
+    //   '/vec-api': {
+    //     target: "http://192.168.2.130:8686/v1",
+    //     changeOrigin: true,
+    //     secure: false,
+    //     rewrite: (path) => path.replace(/^\/vec-api/, '')
+    //   },
+    //   '/fra-api': {
+    //     target: "http://192.168.2.130:2022",
+    //     changeOrigin: true,
+    //     secure: false,
+    //     rewrite: (path) => path.replace(/^\/fra-api/, '')
+    //   },
+    //   '/det-api': {
+    //     target: "http://192.168.2.130:2468",
+    //     changeOrigin: true,
+    //     secure: false,
+    //     rewrite: (path) => path.replace(/^\/det-api/, '')
+    //   },
+    //   '/sys-ws': {
+    //     target: 'ws://192.168.2.130:5171',
+    //     ws: true,
+    //     changeOrigin: true,
+    //     secure: false,
+    //     rewrite: (path) => path.replace(/^\/sys-ws/, '')
+    //   }
+    // }
   }
 })
