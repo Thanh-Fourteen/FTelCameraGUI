@@ -135,7 +135,9 @@ const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(({
       setWsUrl(getStreamUrl(newCameraState));
 
     } catch (error: any) {
-      const msg = error.response?.data?.detail || "Error starting camera";
+      let errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error("Error starting camera:", errorMessage);
+      const msg = error.response?.data?.detail || errorMessage || "Error starting camera";
       notify(msg, 'error');
     } finally {
       setIsProcessing(false);
@@ -153,7 +155,8 @@ const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(({
 
       setCamera(prev => ({ ...prev, isLive: false, status: 'stopped' }));
     } catch (error: any) {
-      const msg = error.response?.data?.detail || "Error stopping camera";
+      let errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const msg = error.response?.data?.detail || errorMessage || "Error stopping camera";
       console.error(msg);
       notify(msg, 'error');
     } finally {

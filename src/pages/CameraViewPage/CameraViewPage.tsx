@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
 // Component
@@ -9,7 +9,6 @@ import SharedHeader from '../../components/layout/SharedHeader/SharedHeader';
 // Service & Hooks
 import { cameraService } from '../../services/cameraService';
 import { kafkaService } from '../../services/kafkaService';
-import { useSystemStatus } from '../../hooks/useSystemStatus';
 import { useNotification } from '../../context/NotificationContext';
 
 // Types
@@ -20,12 +19,10 @@ const CameraViewPage: React.FC = () => {
   const navigate = useNavigate();
   const { notify } = useNotification();
 
-  // Hook Realtime
-  const { systemStatus, cameraStatuses } = useSystemStatus();
-
   // --- STATE ---
   const [camera, setCamera] = useState<Camera | null>(null);
   const [loading, setLoading] = useState(true);
+  const [nodeIp, setNodeIp] = useState<string>('');
 
   // State Kafka
   const [isKafkaEnabled, setIsKafkaEnabled] = useState<boolean>(false);
@@ -34,96 +31,92 @@ const CameraViewPage: React.FC = () => {
   // State Config Modal
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [snapshotUrl, setSnapshotUrl] = useState('');
-
-
-  const currentInstanceDisplay = [{
-    instance_id: instanceId || 'unknown',
-    // ip_address: (camera as any).node_ip || 'unknown',
-    port: 0,
-    status: 'online'
-  }];
-  // State Hover nút Config
   const [isConfigHover, setIsConfigHover] = useState(false);
 
   const cameraRef = useRef<CameraViewHandle>(null);
 
-  // --- INITIAL FETCH (ĐÃ SỬA LOGIC LẤY INSTANCE ID) ---
-  useEffect(() => {
+  // 1. FETCH DỮ LIỆU BAN ĐẦU
+  const initData = useCallback(async () => {
     if (!instanceId || !camId) return;
+    try {
+      setLoading(true);
+      const camData = await cameraService.getById(camId, instanceId);
 
-    const initData = async () => {
-      try {
-        setLoading(true);
-        const camData = await cameraService.getById(camId, instanceId);
-
-        if (camData) {
-          setCamera({
-            ...camData,
-            node_id: instanceId,
-            id: camData.camera_id || camId,
-            node_ip: (camData as any).node_ip || '',
-            name: camData.name || camId,
-            isLive: camData.status === 'running'
-          } as any);
-
-          // Lấy Kafka status
-          try {
-            const kafkaData = await kafkaService.status(instanceId);
-            setIsKafkaEnabled(kafkaData.status === 'running');
-          } catch (e) { }
-
-        } else {
-          notify("Camera not found", "error");
-          navigate('/camera');
-        }
-      } catch (error) {
-        console.error(error);
-        notify("Failed to load camera", "error");
+      if (camData) {
+        setNodeIp((camData as any).node_ip || '');
+        setCamera({
+          ...camData,
+          node_id: instanceId,
+          id: camData.camera_id || camId,
+          node_ip: (camData as any).node_ip || '',
+          name: camData.name || camId,
+          isLive: camData.status === 'running'
+        } as any);
+      } else {
+        notify("Camera not found", "error");
         navigate('/camera');
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (error) {
+      console.error(error);
+      notify("Failed to load camera details", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [instanceId, camId, navigate, notify]);
 
-    initData();
-  }, [instanceId, camId, navigate, notify]); // Dependencies thay đổi
+  // 2. FETCH STATUS (KAFKA & CAMERA) - GIỐNG CARD MANAGER
+  const fetchStatuses = useCallback(async () => {
+    if (!instanceId || !camId) return;
+    try {
+      // Gọi song song để tối ưu
+      const [kafkaStatus, freshCamData] = await Promise.all([
+        kafkaService.status(instanceId).catch(() => null),
+        cameraService.getById(camId, instanceId).catch(() => null)
+      ]);
 
-  // --- REAL-TIME SYNC ---
+      // Cập nhật Kafka
+      if (kafkaStatus) {
+        setIsKafkaEnabled(kafkaStatus.status === 'running' || kafkaStatus.is_active === true);
+      }
+
+      // Cập nhật Camera Status (Chỉ cập nhật những trường liên quan đến trạng thái)
+      if (freshCamData) {
+        const newIsLive = freshCamData.status === 'running' || freshCamData.status === 'starting';
+        setCamera(prev => {
+          if (!prev) return null;
+          // Chỉ cập nhật nếu status thay đổi để tránh trigger re-render Modal vô ích
+          if (prev.status === freshCamData.status && prev.isLive === newIsLive) return prev;
+          return { ...prev, status: freshCamData.status, isLive: newIsLive };
+        });
+      }
+    } catch (e) {
+      console.error("Polling status error:", e);
+    }
+  }, [instanceId, camId]);
+
+  // Khởi tạo lần đầu
   useEffect(() => {
+    initData();
+  }, [initData]);
 
-    if (systemStatus?.kafka) {
-      setIsKafkaEnabled(systemStatus.kafka.status === 'running');
-    }
-
-    // 2. Sync Camera Status
-    if (cameraStatuses && camId) {
-      const update = cameraStatuses.find(s => s.camera_id === camId);
-      if (update) {
-        const newIsLive = update.status === 'running' || update.status === 'starting';
-        if (camera?.status !== update.status || camera?.isLive !== newIsLive) {
-          setCamera(prev => prev ? ({ ...prev, status: update.status, isLive: newIsLive }) : null);
-        }
-      }
-      // Logic xóa camera realtime (nếu cần)
-    }
-  }, [systemStatus, cameraStatuses, camera, camId]);
+  // Thiết lập Polling (Lấy status liên tục mỗi 5 giây)
+  useEffect(() => {
+    fetchStatuses(); // Chạy ngay lập tức lần đầu
+    const timer = setInterval(fetchStatuses, 5000);
+    return () => clearInterval(timer);
+  }, [fetchStatuses]);
 
   // --- HANDLERS ---
-
   const handleToggleKafka = async () => {
-    if (isToggling) return;
+    if (isToggling || !instanceId) return;
     setIsToggling(true);
     try {
       const newState = !isKafkaEnabled;
-      // Lấy instanceId từ camera state (đã lưu ở bước init)
-      const instanceId = (camera as any)?.node_id || 'default';
-
       await kafkaService.toggle(instanceId, newState);
-
       setIsKafkaEnabled(newState);
-      notify(`Kafka on ${instanceId} turned ${newState ? 'ON' : 'OFF'}`, "success");
-    } catch (e) {
-      notify("Kafka toggle failed", "error");
+      notify(`Kafka turned ${newState ? 'ON' : 'OFF'}`, "success");
+    } catch (e: any) {
+      notify(e.message || "Failed to toggle Kafka", "error");
     } finally {
       setIsToggling(false);
     }
@@ -138,16 +131,14 @@ const CameraViewPage: React.FC = () => {
   };
 
   const handleConfigUpdate = (updatedCamera: Camera) => {
-    setCamera(prev => ({ ...prev, ...updatedCamera }));
+    // Merge dữ liệu mới sau khi save thành công
+    setCamera(prev => prev ? ({ ...prev, ...updatedCamera }) : null);
   };
 
   const handleDeleteCamera = async (cameraId: string) => {
+    if (!instanceId) return;
     try {
-      // Lấy instanceId chuẩn xác
-      const instanceId = (camera as any)?.node_id || 'default';
-
       await cameraService.delete(instanceId, cameraId);
-
       setIsConfigOpen(false);
       navigate('/camera');
       notify("Camera deleted successfully", "success");
@@ -156,10 +147,18 @@ const CameraViewPage: React.FC = () => {
     }
   };
 
-  // --- RENDER ---
+  // Header display data
+  const currentInstanceDisplay = useMemo(() => [{
+    instance_id: instanceId || 'unknown',
+    ip_address: nodeIp,
+    port: 0,
+    status: 'online'
+  }], [instanceId, nodeIp]);
+
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#6b7280' }}>
-      Loading camera details...
+      <div className="spinner"></div>
+      <p style={{marginLeft: '10px'}}>Loading camera details...</p>
     </div>
   );
 
@@ -167,16 +166,14 @@ const CameraViewPage: React.FC = () => {
 
   return (
     <div style={inlineStyles.container}>
-
-      {/* HEADER */}
       <SharedHeader
         title={`Camera: ${camera.name}`}
         subtitle={camera.isLive ? "● LIVE STREAMING" : "Offline"}
         onBack={() => navigate('/camera')}
         instances={currentInstanceDisplay as any}
         selectedInstanceId={instanceId || 'default'}
-        onInstanceChange={() => { /* No-op hoặc notify("Cannot change backend in detail view") */ }}
-        onRefreshInstances={() => { }}
+        onInstanceChange={() => { }}
+        onRefreshInstances={initData}
         kafkaState={{
           isEnabled: isKafkaEnabled,
           isToggling: isToggling,
@@ -191,14 +188,12 @@ const CameraViewPage: React.FC = () => {
             ...inlineStyles.configBtn,
             backgroundColor: isConfigHover ? '#ffffff' : '#e5e7eb',
             borderColor: isConfigHover ? '#9ca3af' : '#d1d5db',
-            boxShadow: isConfigHover ? '0 2px 5px rgba(0,0,0,0.05)' : 'none'
           }}
         >
           ⚙ Config
         </button>
       </SharedHeader>
 
-      {/* MAIN VIEWPORT */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <CameraView
           ref={cameraRef}
@@ -207,25 +202,21 @@ const CameraViewPage: React.FC = () => {
         />
       </div>
 
-      {/* CONFIG MODAL */}
       {isConfigOpen && (
         <EditConfigModal
           isOpen={isConfigOpen}
           onClose={() => setIsConfigOpen(false)}
           camera={camera}
-          // Lấy instanceId từ camera object (đã được gán ở bước fetch trước đó)
-          instanceId={(camera as any).node_id || 'default'}
+          instanceId={instanceId || 'default'}
           onUpdate={handleConfigUpdate}
           onDelete={handleDeleteCamera}
           snapshotUrl={snapshotUrl}
         />
       )}
-
     </div>
   );
 };
 
-// --- STYLES ---
 const inlineStyles: { [key: string]: React.CSSProperties } = {
   container: {
     padding: '32px',
@@ -238,7 +229,6 @@ const inlineStyles: { [key: string]: React.CSSProperties } = {
   },
   configBtn: {
     padding: '6px 12px',
-    background: '#e5e7eb',
     border: '1px solid #d1d5db',
     borderRadius: '4px',
     cursor: 'pointer',

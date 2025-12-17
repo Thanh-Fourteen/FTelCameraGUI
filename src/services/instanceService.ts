@@ -37,6 +37,6 @@ export const instanceService = {
   // Xóa máy
   delete: async (instanceId: string) => {
     const { apiBaseUrl } = getConfig();
-    await axios.delete(`${apiBaseUrl}/${instanceId}`);
+    await axios.delete(`${apiBaseUrl}/instances/${instanceId}`);
   }
 };

@@ -40,12 +40,12 @@ export const features: Feature[] = [
     link: '/image-analysis',
     bgColor: '#f3e8ff', // Tím nhạt
   },
-  //   {
-  //   id: 'settings',
-  //   title: 'Cài đặt hệ thống',
-  //   description: 'Cấu hình chung, quản lý người dùng và kết nối.',
-  //   icon: '⚙️',
-  //   link: '/settings',
-  //   bgColor: '#f1f5f9', // Xám nhạt
-  // },
+    {
+    id: 'model-comparison',
+    title: 'Model Comparison',
+    description: 'Compare different models and their performance.',
+    icon: '📊',
+    link: '/model-comparison',
+    bgColor: '#f1f5f9', // Xám nhạt
+  },
 ];

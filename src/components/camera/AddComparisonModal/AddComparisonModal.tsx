@@ -117,7 +117,8 @@ const AddComparisonModal: React.FC<AddComparisonModalProps> = ({ isOpen, onClose
             onSuccess();
             onClose();
         } catch (error: any) {
-            notify(error.response?.data?.detail || "Action failed", 'error');
+            let errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            notify(`Action failed: ${errorMessage}`, 'error');
         } finally {
             setLoading(false);
         }

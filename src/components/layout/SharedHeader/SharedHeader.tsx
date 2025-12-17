@@ -55,7 +55,7 @@ const SharedHeader: React.FC<SharedHeaderProps> = ({
                  <optgroup label="Specific Instances">
                     {instances.map(inst => (
                         <option key={inst.instance_id} value={inst.instance_id}>
-                           🖥️ {inst.instance_id} ({inst.status})
+                           🖥️ {inst.instance_id} ({inst.ip_address})
                         </option>
                     ))}
                  </optgroup>

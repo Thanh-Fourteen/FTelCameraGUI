@@ -29,7 +29,8 @@ const RTSP_RECOMMENDS = [
   "rtsp://172.17.0.1:8222/live_face",
   "rtsp://172.17.0.1:8222/live_crowd",
   "rtsp://172.17.0.1:8222/live_bv",
-  "rtsp://172.17.0.1:8222/live_fire"
+  "rtsp://172.17.0.1:8222/live_fire",
+  "rtsp://172.17.0.1:8222/live_fall"
 ];
 
 // Logic xử lý ràng buộc giữa các module
@@ -147,7 +148,8 @@ const AddCameraModal: React.FC<AddCameraModalProps> = ({ isOpen, onClose, onSucc
       await cameraService.create(instanceId, payload);
       notify("Saved successfully", "success"); onSuccess(); onClose();
     } catch (error: any) {
-      notify(error.response?.data?.detail || "Save failed", "error");
+      let errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      notify(`Save failed: ${errorMessage}`, "error");
     } finally { setLoading(false); }
   };
 

@@ -14,7 +14,7 @@ const MENU_ITEMS = [
   { path: '/camera', label: 'Camera Management', icon: '📹' },
   { path: '/face-register', label: 'Face registration', icon: '👤' },
   { path: '/image-analysis', label: 'Image Analysis', icon: '🖼️' },
-  { path: '/model-comparison', label: 'Model Comparison', icon: '⚔️' },
+  { path: '/model-comparison', label: 'Model Comparison', icon: '📊' },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {

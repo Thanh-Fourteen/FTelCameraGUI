@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import styles from '../AddCameraModal/AddCameraModal.module.css'; 
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import styles from '../AddCameraModal/AddCameraModal.module.css';
 import Button from '../../common/Button/Button';
 import ConfigForm from '../../camera/ConfigForm/ConfigForm';
 import { cameraService } from '../../../services/cameraService';
@@ -10,7 +10,7 @@ import { useNotification } from '../../../context/NotificationContext';
 interface EditConfigModalProps {
     isOpen: boolean;
     onClose: () => void;
-    camera: Camera; // Dữ liệu sơ bộ từ danh sách
+    camera: Camera;
     onUpdate: (updatedCamera: Camera) => void;
     instanceId: string;
     onDelete: (cameraId: string) => void;
@@ -68,33 +68,36 @@ const resolveModuleDependencies = (clickedId: string, currentSelected: string[])
     return newSelected;
 };
 
-const EditConfigModal: React.FC<EditConfigModalProps> = ({ 
-    isOpen, onClose, camera, onUpdate, onDelete, instanceId, 
-    streamResolution = { width: 1920, height: 1080 }, snapshotUrl 
+const EditConfigModal: React.FC<EditConfigModalProps> = ({
+    isOpen, onClose, camera, onUpdate, onDelete, instanceId,
+    streamResolution = { width: 1920, height: 1080 }, snapshotUrl
 }) => {
     const { notify } = useNotification();
-    
+
+    // Flag để tránh việc load schema nhiều lần khi modal đã mở
+    const isInitialized = useRef(false);
+
+    // Form State
     const [rtspUrl, setRtspUrl] = useState('');
     const [wsPort, setWsPort] = useState<string>('9090');
     const [selectedModules, setSelectedModules] = useState<string[]>([]);
     const [polygonStr, setPolygonStr] = useState('[]');
     const [schema, setSchema] = useState<SettingsSchema | null>(null);
     const [config, setConfig] = useState<Record<string, any>>({});
+
+    // UI State
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    // Hàm build config tổng lực từ Schema và dữ liệu thật
+    // Hàm build config từ Schema
     const buildFullConfigFromSchema = useCallback((schemaData: SettingsSchema, fetchedCamera: Camera) => {
         const fullConfig: Record<string, any> = {};
         Object.keys(schemaData).forEach((serviceKey) => {
             if (typeof schemaData[serviceKey] !== 'object' || !schemaData[serviceKey].fields) return;
-
             const serviceConfig: Record<string, any> = {};
             schemaData[serviceKey].fields.forEach((field) => {
-                // Lấy từ settings.config của camera vừa fetch được
                 const savedValue = fetchedCamera.settings?.config?.[serviceKey]?.[field.key];
-                
                 if (savedValue !== undefined) {
                     serviceConfig[field.key] = savedValue;
                 } else {
@@ -106,42 +109,41 @@ const EditConfigModal: React.FC<EditConfigModalProps> = ({
         return fullConfig;
     }, []);
 
-    // Luồng khởi tạo dữ liệu chính xác
-    const initData = useCallback(async () => {
+    // Logic lấy Schema và khởi tạo dữ liệu
+    const loadDataOnce = useCallback(async (currentCamera: Camera) => {
         setLoading(true);
         try {
-            // 1. Fetch dữ liệu "tươi" nhất của Camera từ server
-            const freshCamera = await cameraService.getById(camera.camera_id, instanceId);
-            if (!freshCamera) throw new Error("Could not fetch camera detail");
-
-            // 2. Fetch Schema của node
             const schemaData = await cameraService.getSettingsSchema(instanceId);
             setSchema(schemaData);
 
-            // 3. Cập nhật các state cơ bản từ freshCamera
-            setRtspUrl(freshCamera.rtsp_url || '');
-            setWsPort(freshCamera.ws_port?.toString() || '9090');
-            setSelectedModules(freshCamera.settings?.modules || []);
-            setPolygonStr(JSON.stringify(freshCamera.settings?.polygon || []));
-
-            // 4. Merge config dựa trên Schema và dữ liệu tươi
-            const mergedConfig = buildFullConfigFromSchema(schemaData, freshCamera);
+            const mergedConfig = buildFullConfigFromSchema(schemaData, currentCamera);
             setConfig(mergedConfig);
 
-        } catch (error) {
-            console.error(error);
-            notify("Failed to initialize camera settings", "error");
+            isInitialized.current = true;
+        } catch (error: any) {
+            notify("Failed to load configuration schema", "error");
             onClose();
         } finally {
             setLoading(false);
         }
-    }, [camera.camera_id, instanceId, buildFullConfigFromSchema, notify, onClose]);
+    }, [instanceId, buildFullConfigFromSchema, notify, onClose]);
 
+    // CHỈ CHẠY KHI MỞ MODAL
     useEffect(() => {
-        if (isOpen) {
-            initData();
+        if (isOpen && camera) {
+            // Khởi tạo các state đơn giản
+            setRtspUrl(camera.rtsp_url || '');
+            setWsPort(camera.ws_port?.toString() || '9090');
+            setSelectedModules(camera.settings?.modules || []);
+            setPolygonStr(JSON.stringify(camera.settings?.polygon || []));
+
+            // Tải schema và map config nâng cao
+            loadDataOnce(camera);
+        } else {
+            // Reset khi đóng modal để lần sau load lại sạch sẽ
+            isInitialized.current = false;
         }
-    }, [isOpen, initData]);
+    }, [isOpen]);
 
     const handleSave = async () => {
         setLoading(true);
@@ -161,10 +163,10 @@ const EditConfigModal: React.FC<EditConfigModalProps> = ({
             onUpdate({ ...camera, ...updatedData });
             notify("Updated successfully", "success");
             onClose();
-        } catch (e) { 
-            notify("Update failed", "error"); 
-        } finally { 
-            setLoading(false); 
+        } catch (e) {
+            notify("Update failed", "error");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -175,27 +177,28 @@ const EditConfigModal: React.FC<EditConfigModalProps> = ({
             <div className={styles.overlay} onClick={onClose}>
                 <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
                     <div className={styles.header}>
-                        <h3 className={styles.title}>Config: {camera.name}</h3>
+                        <h3 className={styles.title}>Config: {camera.name || camera.camera_id}</h3>
                         <button className={styles.closeBtn} onClick={onClose}>&times;</button>
                     </div>
 
                     <div className={styles.body} style={{ overflowY: 'auto', maxHeight: '70vh' }}>
-                        {loading && <div style={{textAlign: 'center', padding: '10px'}}>Loading camera configuration...</div>}
-                        
-                        {!loading && (
+                        {loading && !schema ? (
+                            <div style={{ textAlign: 'center', padding: '20px' }}>Loading configuration...</div>
+                        ) : (
                             <>
                                 <div className={styles.formGroup} style={{ marginBottom: '16px' }}>
                                     <label className={styles.label}>RTSP URL</label>
-                                    <input 
-                                        className={styles.input} 
-                                        value={rtspUrl} 
+                                    <input
+                                        className={styles.input}
+                                        value={rtspUrl}
                                         list="rtsp-recommends"
-                                        onChange={e => setRtspUrl(e.target.value)} 
+                                        onChange={e => setRtspUrl(e.target.value)}
                                     />
                                     <datalist id="rtsp-recommends">
                                         {RTSP_RECOMMENDS.map(url => <option key={url} value={url} />)}
                                     </datalist>
                                 </div>
+
                                 <div className={styles.formGroup} style={{ marginBottom: '16px' }}>
                                     <label className={styles.label}>WS Port</label>
                                     <input type="number" className={styles.input} value={wsPort} onChange={e => setWsPort(e.target.value)} />
@@ -206,11 +209,11 @@ const EditConfigModal: React.FC<EditConfigModalProps> = ({
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '10px', border: '1px solid #eee', borderRadius: '8px', marginTop: '5px' }}>
                                         {AVAILABLE_MODULES.map(mod => (
                                             <label key={mod.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px' }}>
-                                                <input 
-                                                    type="checkbox" 
-                                                    checked={selectedModules.includes(mod.id)} 
-                                                    onChange={() => setSelectedModules(resolveModuleDependencies(mod.id, selectedModules))} 
-                                                /> 
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedModules.includes(mod.id)}
+                                                    onChange={() => setSelectedModules(resolveModuleDependencies(mod.id, selectedModules))}
+                                                />
                                                 {mod.label}
                                             </label>
                                         ))}
@@ -233,11 +236,11 @@ const EditConfigModal: React.FC<EditConfigModalProps> = ({
                                             </div>
                                         )}
                                         {schema && (
-                                            <ConfigForm 
-                                                schema={schema} 
-                                                selectedModules={selectedModules} 
-                                                config={config} 
-                                                onChange={(s, k, v) => setConfig(prev => ({ ...prev, [s]: { ...prev[s], [k]: v } }))} 
+                                            <ConfigForm
+                                                schema={schema}
+                                                selectedModules={selectedModules}
+                                                config={config}
+                                                onChange={(s, k, v) => setConfig(prev => ({ ...prev, [s]: { ...prev[s], [k]: v } }))}
                                             />
                                         )}
                                     </div>
@@ -251,18 +254,18 @@ const EditConfigModal: React.FC<EditConfigModalProps> = ({
                         <div style={{ display: 'flex', gap: '10px' }}>
                             <Button variant="text" onClick={onClose} disabled={loading}>Cancel</Button>
                             <Button variant="primary" onClick={handleSave} disabled={loading}>
-                                {loading ? 'Initializing...' : 'Save Changes'}
+                                {loading ? 'Saving...' : 'Save Changes'}
                             </Button>
                         </div>
                     </div>
                 </div>
             </div>
-            
-            <PolygonDrawerModal 
-                isOpen={isDrawerOpen} 
-                onClose={() => setIsDrawerOpen(false)} 
-                onSave={p => setPolygonStr(JSON.stringify(p))} 
-                initialData={(() => { try { return JSON.parse(polygonStr) } catch { return [] } })()} 
+
+            <PolygonDrawerModal
+                isOpen={isDrawerOpen}
+                onClose={() => setIsDrawerOpen(false)}
+                onSave={p => setPolygonStr(JSON.stringify(p))}
+                initialData={(() => { try { return JSON.parse(polygonStr) } catch { return [] } })()}
                 backgroundImage={snapshotUrl}
                 videoWidth={streamResolution.width}
                 videoHeight={streamResolution.height}

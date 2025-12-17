@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import styles from './PolygonDrawerModal.module.css';
 
 interface Point {
@@ -10,63 +10,62 @@ interface PolygonDrawerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (points: number[][]) => void;
-  initialData?: number[][]; // Dữ liệu cũ nếu có
-  backgroundImage?: string; // (Optional) Ảnh snapshot từ camera để vẽ đè lên
-
+  initialData?: number[][];
+  backgroundImage?: string;
   videoWidth?: number;
   videoHeight?: number;
 }
 
-
 const PolygonDrawerModal: React.FC<PolygonDrawerModalProps> = ({
-  isOpen, onClose, onSave, initialData, backgroundImage, videoWidth = 854, // Default nếu không truyền
+  isOpen,
+  onClose,
+  onSave,
+  initialData,
+  backgroundImage,
+  videoWidth = 854,
   videoHeight = 480
 }) => {
-  // State lưu danh sách điểm (Tọa độ chuẩn 1920x1080)
   const [points, setPoints] = useState<Point[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Load dữ liệu cũ khi mở modal
+  // Load dữ liệu ban đầu
   useEffect(() => {
-    if (isOpen && initialData && initialData.length > 0) {
-      // Convert mảng mảng [[x,y]] sang object [{x,y}]
-      const formatted = initialData.map(p => ({ x: p[0], y: p[1] }));
-      setPoints(formatted);
-    } else {
-      setPoints([]);
+    if (isOpen) {
+      if (initialData && initialData.length > 0) {
+        setPoints(initialData.map(p => ({ x: p[0], y: p[1] })));
+      } else {
+        setPoints([]);
+      }
     }
-  }, [isOpen, initialData]);
+  }, [isOpen]);
 
-  // Vẽ lại Canvas mỗi khi points thay đổi hoặc resize
-  useEffect(() => {
-    if (!isOpen || !canvasRef.current || !containerRef.current) return;
+  // Hàm vẽ Canvas
+  const draw = useCallback(() => {
+    if (!canvasRef.current || !containerRef.current) return;
+    
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const { clientWidth, clientHeight } = containerRef.current;
 
+    // Cập nhật kích thước canvas theo thực tế hiển thị
     canvas.width = clientWidth;
     canvas.height = clientHeight;
 
     if (!ctx) return;
-
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Tính tỉ lệ scale từ 1920 -> Màn hình thực tế
+    // Tỉ lệ scale để hiển thị tọa độ thực lên màn hình
     const drawScaleX = clientWidth / videoWidth;
     const drawScaleY = clientHeight / videoHeight;
 
-    // VẼ ĐA GIÁC
     if (points.length > 0) {
       ctx.beginPath();
       ctx.lineWidth = 3;
-      ctx.strokeStyle = '#00ff00'; // Màu xanh lá
-      ctx.fillStyle = 'rgba(0, 255, 0, 0.3)'; // Màu nền mờ
+      ctx.strokeStyle = '#3b82f6'; // Màu xanh dương highlight
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.3)';
 
-      // Di chuyển tới điểm đầu
       ctx.moveTo(points[0].x * drawScaleX, points[0].y * drawScaleY);
-
-      // Line to
       for (let i = 1; i < points.length; i++) {
         ctx.lineTo(points[i].x * drawScaleX, points[i].y * drawScaleY);
       }
@@ -75,20 +74,28 @@ const PolygonDrawerModal: React.FC<PolygonDrawerModalProps> = ({
       ctx.fill();
       ctx.stroke();
 
-      // VẼ CÁC CHẤM TRÒN TẠI ĐỈNH
+      // Vẽ các đỉnh đa giác
       points.forEach((p, index) => {
         ctx.beginPath();
-        // Scale tọa độ điểm để vẽ đúng vị trí trên màn hình nhỏ
-        ctx.arc(p.x * drawScaleX, p.y * drawScaleY, 5, 0, 2 * Math.PI);
-        // ...
-        ctx.fillStyle = index === 0 ? 'red' : 'yellow'; // Điểm đầu màu đỏ
+        ctx.arc(p.x * drawScaleX, p.y * drawScaleY, 6, 0, 2 * Math.PI);
+        ctx.fillStyle = index === 0 ? '#ef4444' : '#fbbf24'; // Điểm đầu đỏ, điểm sau vàng
         ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
         ctx.stroke();
       });
     }
-  }, [points, isOpen]);
+  }, [points, videoWidth, videoHeight]);
 
-  // Xử lý click chuột để thêm điểm
+  // Vẽ lại khi points thay đổi hoặc cửa sổ resize
+  useEffect(() => {
+    if (isOpen) {
+      draw();
+      window.addEventListener('resize', draw);
+    }
+    return () => window.removeEventListener('resize', draw);
+  }, [isOpen, draw]);
+
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
 
@@ -96,28 +103,21 @@ const PolygonDrawerModal: React.FC<PolygonDrawerModalProps> = ({
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
 
-    // --- CÔNG THỨC SCALE MỚI ---
-    // Tỉ lệ = Kích thước video gốc / Kích thước hiển thị trên màn hình
-    const scaleX = videoWidth / rect.width;
-    const scaleY = videoHeight / rect.height;
+    // Tính toán tọa độ thực tế dựa trên độ phân giải gốc của camera
+    const realX = Math.round((clickX / rect.width) * videoWidth);
+    const realY = Math.round((clickY / rect.height) * videoHeight);
 
-    const realX = Math.round(clickX * scaleX);
-    const realY = Math.round(clickY * scaleY);
+    // Giới hạn tọa độ trong phạm vi video
+    const boundedX = Math.max(0, Math.min(realX, videoWidth));
+    const boundedY = Math.max(0, Math.min(realY, videoHeight));
 
-    // Lưu tọa độ thực (theo video gốc)
-    setPoints([...points, { x: realX, y: realY }]);
+    setPoints([...points, { x: boundedX, y: boundedY }]);
   };
 
-  const handleUndo = () => {
-    setPoints(prev => prev.slice(0, -1));
-  };
-
-  const handleClear = () => {
-    setPoints([]);
-  };
+  const handleUndo = () => setPoints(prev => prev.slice(0, -1));
+  const handleClear = () => setPoints([]);
 
   const handleConfirm = () => {
-    // Convert về dạng mảng lồng nhau [[x,y], [x,y]]
     const exportData = points.map(p => [p.x, p.y]);
     onSave(exportData);
     onClose();
@@ -129,46 +129,60 @@ const PolygonDrawerModal: React.FC<PolygonDrawerModalProps> = ({
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
-          <h3>Draw Counting Zone</h3>
-          <button className={styles.closeBtn} onClick={onClose}>×</button>
+          <h3>✏️ Draw Detection Zone</h3>
+          <button className={styles.closeBtn} onClick={onClose}>&times;</button>
         </div>
 
         <div className={styles.body}>
-          {/* <div style={{ fontSize: '12px', color: '#666', marginBottom: '5px' }}>
-            Resolution Base: {videoWidth} x {videoHeight}
-          </div> */}
-          <p className={styles.instruction}>Click mouse on the screen to create points. The system will connect them automatically.</p>
+          <p className={styles.instruction}>
+            Click on the image to define the boundaries. The system will connect the points in order.
+          </p>
 
-          {/* KHUNG VẼ */}
           <div
             className={styles.canvasContainer}
             ref={containerRef}
             onClick={handleCanvasClick}
             style={{
               backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'none',
-              backgroundColor: backgroundImage ? 'transparent' : '#000'
+              backgroundSize: 'contain',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'center',
+              backgroundColor: '#000',
+              aspectRatio: `${videoWidth}/${videoHeight}`,
             }}
           >
-            {/* Nếu không có ảnh nền thì hiện text placeholder */}
-            {!backgroundImage && <div className={styles.placeholderText}>Aspect ratio (16:9)</div>}
-
+            {!backgroundImage && (
+              <div className={styles.placeholderText}>
+                No preview available. Drawing on {videoWidth}x{videoHeight} canvas.
+              </div>
+            )}
             <canvas ref={canvasRef} className={styles.canvas} />
           </div>
 
           <div className={styles.coordPreview}>
-            Points selected: {points.length}
-            {points.length > 0 && <span style={{ fontSize: '11px', color: '#666' }}> (Last: {points[points.length - 1].x}, {points[points.length - 1].y})</span>}
+            <strong>Points: {points.length}</strong>
+            {points.length > 0 && (
+              <span className={styles.lastPoint}> 
+                (Current pos: {points[points.length - 1].x}, {points[points.length - 1].y})
+              </span>
+            )}
           </div>
         </div>
 
         <div className={styles.footer}>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button className={styles.btnSecondary} onClick={handleUndo} disabled={points.length === 0}>↩ Undo</button>
-            <button className={styles.btnSecondary} onClick={handleClear} disabled={points.length === 0}>🗑 Clear</button>
+          <div className={styles.footerLeft}>
+            <button className={styles.btnSecondary} onClick={handleUndo} disabled={points.length === 0}>
+              Undo
+            </button>
+            <button className={styles.btnSecondary} onClick={handleClear} disabled={points.length === 0}>
+              Clear All
+            </button>
           </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button className={styles.btnSecondary} onClick={onClose}>Cancel</button>
-            <button className={styles.btnPrimary} onClick={handleConfirm}>Save</button>
+          <div className={styles.footerRight}>
+            <button className={styles.btnText} onClick={onClose}>Cancel</button>
+            <button className={styles.btnPrimary} onClick={handleConfirm} disabled={points.length < 3}>
+              Save Polygon
+            </button>
           </div>
         </div>
       </div>

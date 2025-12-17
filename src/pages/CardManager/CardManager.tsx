@@ -60,7 +60,8 @@ const CardManager: React.FC = () => {
       }
 
     } catch (error) {
-      notify("Failed to load backend nodes", "error");
+      let errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      notify(errorMessage, "error");
     }
   }, [notify]);
 
@@ -94,8 +95,9 @@ const CardManager: React.FC = () => {
       setCameras(data);
 
     } catch (error) {
+      let errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error("Failed to load cameras", error);
-      notify("Failed to load cameras", "error");
+      notify(errorMessage, "error");
     } finally {
       setLoading(false);
     }
@@ -123,7 +125,8 @@ const CardManager: React.FC = () => {
       setIsKafkaEnabled(newState);
       notify(`Kafka on ${selectedInstanceId} turned ${newState ? 'ON' : 'OFF'}`, "success");
     } catch (error) {
-      notify("Failed to toggle Kafka", "error");
+      let errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      notify(errorMessage, "error");
     } finally {
       setIsTogglingKafka(false);
     }
@@ -211,16 +214,24 @@ const CardManager: React.FC = () => {
                 />
               </div>
             ))}
-            <CameraCard
-              type="add"
-              onClick={handleAddCameraClick}
-            />
 
-
-            {/* Empty State nếu không có cam nào (nhưng vẫn hiện nút Add) */}
+            {/* CHỈ HIỆN CARD THÊM MỚI KHI ĐÃ CHỌN INSTANCE CỤ THỂ */}
+            {selectedInstanceId !== 'all' && (
+              <CameraCard
+                type="add"
+                onClick={handleAddCameraClick}
+              />
+            )}
             {cameras.length === 0 && (
-              <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#9ca3af', padding: 20 }}>
-                No cameras found. Use the "+" card to create one.
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#9ca3af', padding: 40 }}>
+                <p>No cameras found.</p>
+                {selectedInstanceId === 'all' ? (
+                  <p style={{ fontSize: '14px', color: '#3b82f6' }}>
+                    💡 Select a specific Backend Instance to add a new camera.
+                  </p>
+                ) : (
+                  <p>Use the "+" card to create one on this instance.</p>
+                )}
               </div>
             )}
           </div>
