@@ -19,5 +19,15 @@ class InstanceService:
     def remove_node(self, instance_id: str) -> bool:
         return self.repo.delete(instance_id)
 
+    def delete_node(self, instance_id: str):
+        # 1. Xóa trong Repository (Database)
+        result = self.repo.delete(instance_id)
+        
+        # 2. Quan trọng: Dừng việc monitoring máy này ngay lập tức
+        from services.monitor_service import monitor_service
+        monitor_service.stop_monitoring_task(instance_id)
+        
+        return result
+
 # Tạo một instance (singleton) để các Router dùng chung
 instance_service = InstanceService()

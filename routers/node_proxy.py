@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Body
 import httpx
+from httpx import ConnectError, ReadTimeout, Timeout
 import asyncio
 from services.instance_service import instance_service
 from typing import Any, Dict, List, Union
@@ -49,14 +50,15 @@ async def forward_request_to_node(instance_id: str, method: str, path: str, json
 
     base_url = f"http://{target_node.ip_address}:{target_node.port}"
     target_url = f"{base_url}{path}"
+    custom_timeout = httpx.Timeout(30.0, connect=5.0)
 
-    async with httpx.AsyncClient() as client:
+
+    async with httpx.AsyncClient(timeout=custom_timeout) as client:
         try:
             response = await client.request(
                 method=method,
                 url=target_url,
                 json=json_data,
-                timeout=10.0
             )
             
             # --- XỬ LÝ LỖI (MÁY CON TRẢ VỀ 4xx HOẶC 5xx) ---
@@ -65,35 +67,34 @@ async def forward_request_to_node(instance_id: str, method: str, path: str, json
                 print(f"❌ [Node Error] {instance_id} | Status: {response.status_code}")
                 
                 try:
-                    # Đọc JSON lỗi từ máy con
                     error_data = response.json()
-                    
-                    # Nếu máy con dùng FastAPI mặc định, nó trả về {"detail": "..."}
-                    # Nếu máy con dùng format của bạn, nó trả về {"message": "...", ...}
-                    # Chúng ta lấy trường 'detail' hoặc 'message' hoặc nguyên cục JSON
                     final_error_detail = error_data.get("detail") or error_data.get("message") or error_data
                 except:
-                    # Nếu không phải JSON (ví dụ lỗi 500 của Nginx) thì lấy text
                     final_error_detail = response.text
+                raise HTTPException(status_code=response.status_code, detail=final_error_detail)
 
-                # RAISE LỖI: detail này sẽ được FastAPI/Middleware trả về cho FE
-                raise HTTPException(
-                    status_code=response.status_code, 
-                    detail=final_error_detail
-                )
-
-            # --- NẾU THÀNH CÔNG ---
-            origin_data = response.json()
-            return _inject_node_metadata(origin_data, target_node)
+            return _inject_node_metadata(response.json(), target_node)
             
-        except httpx.ConnectError:
-            raise HTTPException(status_code=503, detail="Không thể kết nối tới máy con (Offline)")
+        except ReadTimeout:
+            # Đây là trường hợp Vast đang chạy Docker nhưng phản hồi chậm
+            # Thay vì báo lỗi 500, ta báo lỗi 504 (Gateway Timeout) 
+            # để FE biết là lệnh đã gửi nhưng chờ phản hồi quá lâu
+            print(f"⏳ [ReadTimeout] {instance_id} đang xử lý quá lâu (Docker có thể đang khởi động)")
+            raise HTTPException(
+                status_code=504, 
+                detail="Máy chủ Vast phản hồi chậm (Docker đang khởi động). Vui lòng đợi vài giây rồi Refresh."
+            )
+            
+        except ConnectError:
+            raise HTTPException(status_code=503, detail="Không thể kết nối tới máy con (Offline/Sai IP)")
+            
         except HTTPException as e:
-            # Re-raise để không bị lọt vào Exception tổng
             raise e
+            
         except Exception as e:
+            # Log lỗi chi tiết ra console để biết thực sự là lỗi gì
+            print(f"🔥 [Proxy Error Info]: {type(e).__name__} - {str(e)}")
             raise HTTPException(status_code=500, detail=f"Lỗi hệ thống Proxy: {str(e)}")
-
 # --- CÁC API ROUTER (GIỮ NGUYÊN) ---
 # Vì logic bơm dữ liệu đã nằm trong forward_request_to_node,
 # nên tất cả các hàm dưới đây tự động được hưởng lợi.

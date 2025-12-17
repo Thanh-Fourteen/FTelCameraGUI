@@ -74,5 +74,12 @@ class MonitorService:
         
         task = loop.create_task(self.poll_status_loop(instance_id, status_url))
         self.active_connections[instance_id] = task
-        
+
+    def stop_monitoring_task(self, instance_id: str):
+        if instance_id in self.active_connections:
+            task = self.active_connections[instance_id]
+            task.cancel() # Hủy task chạy ngầm
+            del self.active_connections[instance_id]
+            print(f"🛑 Đã dừng theo dõi máy: {instance_id}")
+            
 monitor_service = MonitorService()
