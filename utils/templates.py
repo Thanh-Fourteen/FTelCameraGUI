@@ -142,7 +142,7 @@ def get_ai_template(cam_id, topic_in, topic_out):
 
         # 6. FACE SERVICE (Cập nhật chuẩn mới EXT_ và SEARCH_URL)
         "face_service": {
-            "image": "tanmai0502/face-service:latest",
+            "image": "tanmai0502/face-services:latest",
             "container_name": f"face_service{suffix}",
             "restart": "unless-stopped",
             "environment": {

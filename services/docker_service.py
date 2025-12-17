@@ -52,7 +52,7 @@ class DockerService:
                         raise ValueError(f"Port {host_port} is already in use by another application.")
         except ValueError as ve:
             raise ve # Ném tiếp ValueError ra ngoài
-        except Exception as e:
+        except ValueError as e:
             if "Port" in str(e) and "in use" in str(e): 
                 raise e
             print(f"Warning skipping port check: {e}")
