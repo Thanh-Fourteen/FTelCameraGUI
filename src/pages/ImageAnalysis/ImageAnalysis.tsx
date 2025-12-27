@@ -6,8 +6,11 @@ import { useNotification } from '../../context/NotificationContext';
 // Lưu ý: Dùng đường dẫn tương đối nếu đã có Proxy, hoặc tuyệt đối nếu chưa
 // const API_DETECT_URL = 'https://det.doca.love/detect';
 // const API_RECOGNIZE_URL = 'https://det.doca.love/recognition';
-const API_DETECT_URL = '/det-api/detect'
-const API_RECOGNIZE_URL = '/det-api/recognition'
+// const API_DETECT_URL = '/det-api/detect'
+// const API_RECOGNIZE_URL = '/det-api/recognition'
+const API_DETECT_URL = 'http://192.168.2.130:2468/detect';
+const API_RECOGNIZE_URL = 'http://192.168.2.130:2468/recognition';
+
 
 type TaskType = 'detect' | 'recognize';
 

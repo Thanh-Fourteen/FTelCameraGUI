@@ -7,7 +7,7 @@ interface SettingsModalProps {
 
 // Cấu hình mặc định (dựa trên vite.config.ts của bạn)
 const DEFAULT_CONFIG = {
-  apiBaseUrl: "http://72.49.200.123:48397",
+  apiBaseUrl: "http://localhost:31313",
   vecBaseUrl: "http://192.168.2.130:8686/v1",
   fraBaseUrl: "http://192.168.2.130:2022",
   detBaseUrl: "http://192.168.2.130:2468",
